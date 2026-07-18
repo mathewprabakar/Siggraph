@@ -21,7 +21,7 @@ Two ways to use it
 Either way it writes  siggraph2026-catalog.json , which you load with the app's
 "Load" button.  Requires:  pip install beautifulsoup4
 """
-import sys, json, argparse
+import sys, json, argparse, re
 from datetime import datetime, timedelta, timezone
 
 PDT = timezone(timedelta(hours=-7))  # SIGGRAPH week is July -> PDT is a fixed UTC-7
@@ -104,12 +104,22 @@ def parse_html(html):
         programs = [PLURAL.get(x, x) for x in etypes]
 
         loc = it.select_one('.presentation-location')
+        link = title_el.select_one('a')
+        url = link.get('href', '').strip() if link else ''
+        if not url and link:
+            # Session-group headers have no href, just a JS toggle like
+            # onclick="full_program_toggle_session_contents('sess172')" --
+            # rebuild the site's own session-page link from that id.
+            m = re.search(r"toggle_session_contents\('(sess\d+)'\)", link.get('onclick', ''))
+            if m:
+                url = f"https://s2026.conference-schedule.org/?post_type=page&p=16&sess={m.group(1)}"
         s = _fmt(smin)
         uid = f"{day}|{s}|{t}".lower().replace('  ', ' ')[:140]
         catalog.append({
             "id": uid, "t": t, "program": programs[0], "programs": programs,
             "day": day, "s": s, "e": _fmt(min(emin, 1439)),
             "room": loc.get_text(' ', strip=True) if loc else "",
+            "url": url,
             "ia": _tags(it, 'interest-area'),
             "kw": _tags(it, 'keyword'),
             "reg": _tags(it, 'registration-category'),
