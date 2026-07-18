@@ -1,0 +1,19 @@
+[project]
+name = "siggraph-timetable-refresh"
+version = "1.0.0"
+description = "Fetch and parse the SIGGRAPH 2026 program into catalog JSON for the timetable app."
+requires-python = ">=3.9"
+dependencies = [
+    "beautifulsoup4>=4.12",
+]
+
+# Optional extras — the script works without these:
+#   fast   : lxml parser (script falls back to the stdlib html.parser if absent)
+#   render : headless-browser --render mode for pulling the live page
+[project.optional-dependencies]
+fast = ["lxml>=5.0"]
+render = ["playwright>=1.44"]
+
+# This is a single script, not an installable package, so uv shouldn't try to build it.
+[tool.uv]
+package = false
