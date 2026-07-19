@@ -88,11 +88,8 @@
   .empty{padding:26px 16px;text-align:center;color:var(--ink-soft);font-size:13px}
   .more-note{padding:10px 14px;text-align:center;font-size:12px;color:var(--ink-soft);font-family:var(--mono);border-top:1px solid var(--line)}
 
-  .adder{border-top:1px solid var(--line);padding:12px}
-  details.adder-d > summary{cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--indigo-ink);letter-spacing:.04em;list-style:none;display:flex;align-items:center;gap:6px}
-  details.adder-d > summary::-webkit-details-marker{display:none}
-  details.adder-d > summary .caret{transition:transform .15s}
-  details.adder-d[open] > summary .caret{transform:rotate(90deg)}
+  .adder{border-top:1px solid var(--line);padding:12px;display:none}
+  .adder.open{display:block}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
   .form-grid .full{grid-column:1/3}
   .form-grid label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:3px}
@@ -229,6 +226,7 @@
         <div class="daychips" id="dayChips"></div>
         <div class="filterbar">
           <button class="ftoggle" id="ftoggle" aria-expanded="false">Filters <span class="fcount" id="fcount">0</span></button>
+          <button class="ftoggle" id="btnAddSession" aria-expanded="false">+ Add session</button>
           <button class="clearf" id="clearFilters">Clear filters</button>
         </div>
         <div class="filterpanel" id="filterPanel">
@@ -237,11 +235,7 @@
           <details class="fgroup" data-group="kw"><summary><span class="caret">▸</span>Keyword<span class="n"></span></summary><div class="checklist"></div></details>
           <details class="fgroup" data-group="reg"><summary><span class="caret">▸</span>Registration Category<span class="n"></span></summary><div class="checklist"></div></details>
         </div>
-      </div>
-      <div class="catalog" id="catalog"></div>
-      <div class="adder">
-        <details class="adder-d" id="adderD">
-          <summary><span class="caret">▸</span> Add a session manually or paste from the site</summary>
+        <div class="adder" id="adderD">
           <p class="paste-hint">Paste a session block copied from the SIGGRAPH schedule, press <strong>Read paste</strong>, tidy up, then Add. (The full program is already built in — use <strong>Refresh from website</strong> to pull the latest.)</p>
           <div class="form-grid">
             <div class="full"><label>Paste from schedule</label><textarea id="pasteBox" placeholder="e.g.  'Battlefield 6': ... 11:30am - 12:00pm PDT Sunday, 19 July 2026 411 Theatre"></textarea></div>
@@ -254,8 +248,9 @@
             <div class="full"><label>Room / location</label><input id="fRoom" type="text" placeholder="Room 403 A"></div>
           </div>
           <div class="form-actions"><button class="tbtn solid" id="btnAddCustom" type="button">Add to my timetable</button></div>
-        </details>
+        </div>
       </div>
+      <div class="catalog" id="catalog"></div>
     </div>
   </section>
 
@@ -4236,6 +4231,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   document.getElementById('search').addEventListener('input',e=>{searchQ=e.target.value;renderCatalog();});
   document.getElementById('ftoggle').onclick=()=>{const p=document.getElementById('filterPanel');const open=p.classList.toggle('open');document.getElementById('ftoggle').setAttribute('aria-expanded',String(open));};
+  document.getElementById('btnAddSession').onclick=()=>{const p=document.getElementById('adderD');const open=p.classList.toggle('open');document.getElementById('btnAddSession').setAttribute('aria-expanded',String(open));if(open)p.scrollIntoView({block:'nearest',behavior:'smooth'});};
   document.getElementById('clearFilters').onclick=()=>{Object.values(F).forEach(s=>s.clear());filterDay='';document.querySelectorAll('#dayChips .chip').forEach((c,i)=>c.setAttribute('aria-pressed',String(i===0)));document.querySelectorAll('.fgroup input').forEach(cb=>cb.checked=false);renderCatalog();syncFilterCounts();toast('Filters cleared');};
 
   document.getElementById('btnIcs').onclick=exportICS;
