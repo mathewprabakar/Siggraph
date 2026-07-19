@@ -151,6 +151,10 @@
   .pop-actions{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
   .pop-link{display:inline-flex;align-items:center;gap:5px;border:none;background:none;padding:0;font-size:11.5px;font-weight:600;color:var(--indigo-ink);text-decoration:none;cursor:pointer;font-family:inherit}
   .pop-link:hover{text-decoration:underline}
+  .map-pop{width:280px;padding:12px}
+  .map-pop .venue-name{font-size:13.5px;font-weight:700;line-height:1.25}
+  .map-pop .venue-addr{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:2px;margin-bottom:10px}
+  .map-pop iframe{width:100%;height:170px;border:0;border-radius:8px;display:block;margin-bottom:8px}
 
   .room-link{cursor:pointer;border-radius:5px;padding:1px 4px;margin:-1px -4px}
   .room-link:hover{background:var(--coral-bg);color:var(--coral)}
@@ -267,6 +271,7 @@
 </div>
 
 <div class="pop" id="pop"></div>
+<div class="pop map-pop" id="mapPop"></div>
 
 <div class="fp-overlay" id="fpOverlay">
   <div class="fp-modal">
@@ -3825,7 +3830,7 @@ function renderCatalog(){
       <button class="add-btn" title="${picked.has(c.id)?'Remove':'Add to my day'}">${picked.has(c.id)?'✓':'+'}</button>`;
     el.querySelector('.add-btn').onclick=()=>togglePick(c);
     const roomLink=el.querySelector('.room-link');
-    if(roomLink)roomLink.onclick=(ev)=>{ev.stopPropagation();openFloorPlan(c.room);};
+    if(roomLink)roomLink.onclick=(ev)=>{ev.stopPropagation();showLocation(c.room,roomLink);};
     frag.appendChild(el);
   });
   box.appendChild(frag);
@@ -3928,6 +3933,7 @@ function syncDayTabs(){
 /* ---- priority popover ---- */
 const pop=document.getElementById('pop');
 function openPop(e,anchor){
+  closeMapPop();
   pop.innerHTML=`<h4>${esc(e.t)}</h4>
     <div class="pm">${esc(e.program)} · ${fmtTime(e.s0)}–${fmtTime(e.e0)}${e.room?(' · '+esc(e.room)):''}</div>
     ${(e.url||e.room)?`<div class="pop-actions">
@@ -3945,7 +3951,7 @@ function openPop(e,anchor){
   pop.querySelectorAll('.pri-btns button').forEach(b=>b.onclick=()=>{setPriority(e.id,parseInt(b.dataset.pr,10));pop.querySelectorAll('.pri-btns button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));});
   pop.querySelector('.remove').onclick=()=>{picked.delete(e.id);saveState();renderCatalog();renderTimetable();syncDayTabs();closePop();toast('Removed');};
   const popFloorBtn=pop.querySelector('#popFloorBtn');
-  if(popFloorBtn)popFloorBtn.onclick=()=>openFloorPlan(e.room);
+  if(popFloorBtn)popFloorBtn.onclick=()=>showLocation(e.room,popFloorBtn);
   pop.classList.add('show');
   const r=anchor.getBoundingClientRect();
   const pw=250, ph=pop.offsetHeight||210;
@@ -3956,6 +3962,45 @@ function openPop(e,anchor){
 function closePop(){pop.classList.remove('show');}
 document.addEventListener('click',e=>{if(!pop.contains(e.target))closePop();});
 window.addEventListener('resize',closePop);
+
+/* ---- off-site venues: Google Maps tooltip ----
+   Sessions held away from the LACC (hotel ballrooms, bars, event spaces) have no
+   floor to highlight, so instead of opening the LACC map we show a small popover
+   with an embedded Google Maps preview + a link to open the full map. */
+const OFFSITE_VENUES=[
+  {match:/exchange la/i,name:'Exchange LA',address:'618 S. Spring Street, Los Angeles, CA 90014'},
+  {match:/hotel per la/i,name:'Hotel Per La, Autograph Collection',address:'649 S Olive St, Los Angeles, CA 90014'},
+  {match:/jw marriott/i,name:'JW Marriott Los Angeles L.A. LIVE',address:'900 W Olympic Blvd, Los Angeles, CA 90015'},
+  {match:/prank bar/i,name:'Prank Bar',address:'1100 S. Hope St., Los Angeles, CA 90015'},
+];
+function findOffsiteVenue(roomStr){
+  const s=normRoomKey(roomStr);
+  if(!s)return null;
+  return OFFSITE_VENUES.find(v=>v.match.test(s))||null;
+}
+const mapPop=document.getElementById('mapPop');
+function openMapPop(venue,anchor){
+  closePop();
+  const q=encodeURIComponent(venue.address);
+  mapPop.innerHTML=`<div class="venue-name">${esc(venue.name)}</div>
+    <div class="venue-addr">${esc(venue.address)}</div>
+    <iframe loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps?q=${q}&output=embed"></iframe>
+    <a class="pop-link" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener noreferrer">↗ Open in Google Maps</a>`;
+  mapPop.classList.add('show');
+  const r=anchor.getBoundingClientRect();
+  const pw=280,ph=mapPop.offsetHeight||280;
+  let left=window.scrollX+r.left; if(left+pw>window.scrollX+window.innerWidth-10)left=window.scrollX+window.innerWidth-pw-10;
+  let top=window.scrollY+r.bottom+6; if(top+ph>window.scrollY+window.innerHeight-10)top=window.scrollY+r.top-ph-6;
+  mapPop.style.left=Math.max(10,left)+'px';mapPop.style.top=Math.max(10,top)+'px';
+}
+function closeMapPop(){mapPop.classList.remove('show');}
+document.addEventListener('click',e=>{if(!mapPop.contains(e.target))closeMapPop();});
+window.addEventListener('resize',closeMapPop);
+function showLocation(roomStr,anchor){
+  const venue=findOffsiteVenue(roomStr);
+  if(venue){openMapPop(venue,anchor);return;}
+  openFloorPlan(roomStr);
+}
 
 /* ---- floor plan: LA Convention Center ----
    Uses the official SIGGRAPH 2026 venue map SVGs (s2026.conference-schedule.org/map/),
@@ -4045,6 +4090,7 @@ function openFloorPlan(roomStr){
   }
   document.getElementById('fpOverlay').classList.add('show');
   closePop();
+  closeMapPop();
 }
 function closeFloorPlan(){document.getElementById('fpOverlay').classList.remove('show');}
 
