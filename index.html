@@ -231,6 +231,8 @@
 
   .room-link{cursor:pointer;border-radius:5px;padding:1px 4px;margin:-1px -4px}
   .room-link:hover{background:var(--wine-bg);color:var(--wine)}
+  .checkitem .room-pin{border:none;background:none;padding:2px 5px;margin-left:4px;border-radius:6px;font-size:12px;line-height:1;flex:none}
+  .checkitem .room-pin:hover{background:var(--wine-bg)}
 
   /* floor plan modal */
   .fp-overlay{display:none;position:fixed;inset:0;background:rgba(30,46,51,.58);z-index:90;align-items:center;justify-content:center;padding:20px}
@@ -310,6 +312,7 @@
           <details class="fgroup" data-group="ia"><summary><span class="caret">▸</span>Interest Area<span class="n"></span></summary><div class="checklist"></div></details>
           <details class="fgroup" data-group="kw"><summary><span class="caret">▸</span>Keyword<span class="n"></span></summary><div class="checklist"></div></details>
           <details class="fgroup" data-group="reg"><summary><span class="caret">▸</span>Registration Category<span class="n"></span></summary><div class="checklist"></div></details>
+          <details class="fgroup" data-group="room"><summary><span class="caret">▸</span>Room<span class="n"></span></summary><div class="checklist"></div></details>
         </div>
         <div class="adder" id="adderD">
           <p class="paste-hint">Paste a session block copied from the SIGGRAPH schedule, press <strong>Read paste</strong>, tidy up, then Add. (The full program is already built in — run <strong>refresh_siggraph.py</strong> and use <strong>Load</strong> to pull the latest.)</p>
@@ -17867,10 +17870,12 @@ let catalog=(typeof BUNDLED_CATALOG!=='undefined'&&BUNDLED_CATALOG.length?BUNDLE
 let picked=new Map();            // id -> normalized event (with pr)
 let activeDay=DAYS[0].iso;
 let filterDay='';
-const F={program:new Set(),ia:new Set(),kw:new Set(),reg:new Set()};
+const F={program:new Set(),ia:new Set(),kw:new Set(),reg:new Set(),room:new Set()};
 let searchQ='';
 let storageOK=true;
 const RENDER_CAP=500;
+/* distinct rooms, for the Filters panel's Room group */
+const T_ROOM=[...new Set(catalog.map(c=>c.room).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
 
 function loadState(){
   try{
@@ -17901,21 +17906,27 @@ function countForOption(group,val){
     if(group==='ia') return a+(c.ia.includes(val)?1:0);
     if(group==='kw') return a+(c.kw.includes(val)?1:0);
     if(group==='reg') return a+(c.reg.includes(val)?1:0);
+    if(group==='room') return a+(c.room===val?1:0);
     return a;
   },0);
 }
 function buildFilterGroups(){
-  const defs=[['program',T_PROGRAM],['ia',T_IA],['kw',T_KEYWORD],['reg',T_REG]];
+  const defs=[['program',T_PROGRAM],['ia',T_IA],['kw',T_KEYWORD],['reg',T_REG],['room',T_ROOM]];
   defs.forEach(([g,opts])=>{
     const list=document.querySelector(`.fgroup[data-group="${g}"] .checklist`);
     list.innerHTML='';
     opts.forEach(val=>{
       const cnt=countForOption(g,val);
       const row=document.createElement('label');row.className='checkitem';
-      row.innerHTML=`<input type="checkbox" value="${esc(val)}"><span>${esc(val)}</span><span class="cnt">${cnt}</span>`;
+      row.innerHTML=`<input type="checkbox" value="${esc(val)}"><span>${esc(val)}</span><span class="cnt">${cnt}</span>`
+        +(g==='room'?`<button type="button" class="room-pin" title="Show ${esc(val)} on the map">📍</button>`:'');
       const cb=row.querySelector('input');
       cb.checked=F[g].has(val);
       cb.onchange=()=>{cb.checked?F[g].add(val):F[g].delete(val);renderCatalog();syncFilterCounts();};
+      if(g==='room'){
+        const pin=row.querySelector('.room-pin');
+        pin.onclick=(ev)=>{ev.preventDefault();ev.stopPropagation();showLocation(val,pin);};
+      }
       list.appendChild(row);
     });
   });
@@ -17979,8 +17990,22 @@ function matchesFilters(c){
   if(F.ia.size&&!c.ia.some(x=>F.ia.has(x)))return false;
   if(F.kw.size&&!c.kw.some(x=>F.kw.has(x)))return false;
   if(F.reg.size&&!c.reg.some(x=>F.reg.has(x)))return false;
+  if(F.room.size&&!F.room.has(c.room))return false;
   if(searchQ){const q=searchQ.trim().toLowerCase();if(q&&!c.hay.includes(q))return false;}
   return true;
+}
+function renderSessionCard(c){
+  const wd=WEEKDAY_BY_ISO[c.day]||'';
+  const el=document.createElement('div');
+  el.className='cat-item'+(picked.has(c.id)?' picked':'');
+  el.innerHTML=`<span class="swatch" style="background:${colorFor(c.program)}"></span>
+    <div class="cat-body"><p class="cat-title">${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="View on the SIGGRAPH schedule site" onclick="event.stopPropagation()">${esc(c.t)} <span class="ext-arrow">↗</span></a>`:esc(c.t)}</p>
+    <div class="cat-meta"><span class="tag">${esc(c.program)}</span><span>${wd} · ${c.s0!=null?fmtTime(c.s0):'—'}–${c.e0!=null?fmtTime(c.e0):''}</span>${c.room?`<span class="room-link" title="Show on floor plan">📍 ${esc(c.room)}</span>`:''}</div></div>
+    <button class="add-btn" title="${picked.has(c.id)?'Remove':'Add to my day'}">${picked.has(c.id)?'✓':'+'}</button>`;
+  el.querySelector('.add-btn').onclick=()=>togglePick(c);
+  const roomLink=el.querySelector('.room-link');
+  if(roomLink)roomLink.onclick=(ev)=>{ev.stopPropagation();showLocation(c.room,roomLink);};
+  return el;
 }
 function renderCatalog(){
   const box=document.getElementById('catalog');
@@ -17991,19 +18016,7 @@ function renderCatalog(){
   const capped=list.slice(0,RENDER_CAP);
   box.innerHTML='';
   const frag=document.createDocumentFragment();
-  capped.forEach(c=>{
-    const wd=WEEKDAY_BY_ISO[c.day]||'';
-    const el=document.createElement('div');
-    el.className='cat-item'+(picked.has(c.id)?' picked':'');
-    el.innerHTML=`<span class="swatch" style="background:${colorFor(c.program)}"></span>
-      <div class="cat-body"><p class="cat-title">${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="View on the SIGGRAPH schedule site" onclick="event.stopPropagation()">${esc(c.t)} <span class="ext-arrow">↗</span></a>`:esc(c.t)}</p>
-      <div class="cat-meta"><span class="tag">${esc(c.program)}</span><span>${wd} · ${c.s0!=null?fmtTime(c.s0):'—'}–${c.e0!=null?fmtTime(c.e0):''}</span>${c.room?`<span class="room-link" title="Show on floor plan">📍 ${esc(c.room)}</span>`:''}</div></div>
-      <button class="add-btn" title="${picked.has(c.id)?'Remove':'Add to my day'}">${picked.has(c.id)?'✓':'+'}</button>`;
-    el.querySelector('.add-btn').onclick=()=>togglePick(c);
-    const roomLink=el.querySelector('.room-link');
-    if(roomLink)roomLink.onclick=(ev)=>{ev.stopPropagation();showLocation(c.room,roomLink);};
-    frag.appendChild(el);
-  });
+  capped.forEach(c=>frag.appendChild(renderSessionCard(c)));
   box.appendChild(frag);
   if(list.length>RENDER_CAP){
     const m=document.createElement('div');m.className='more-note';
