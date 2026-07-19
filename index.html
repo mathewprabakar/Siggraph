@@ -182,6 +182,9 @@
   .hour .lbl{position:absolute;top:-8px;left:0;font-family:var(--mono);font-size:11px;color:var(--ink-soft);width:50px;text-align:right;padding-right:8px}
   .lane{grid-column:2;position:relative;border-left:1px solid var(--line)}
   .lane .halfline{position:absolute;left:0;right:0;border-top:1px dashed #ede5d1}
+  .nowline{position:absolute;left:0;right:0;border-top:2px solid #e03131;z-index:6;pointer-events:none}
+  .nowline .nowdot{position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#e03131}
+  .nowline .nowlbl{position:absolute;right:2px;top:-17px;font-size:9.5px;font-weight:700;color:#e03131;background:rgba(251,248,238,.9);padding:0 4px;border-radius:4px}
   .ev{position:absolute;border-radius:9px;padding:6px 8px;overflow:hidden;color:#fff;box-shadow:0 1px 3px rgba(42,66,73,.22);cursor:pointer;border:1px solid rgba(255,255,255,.25);display:flex;flex-direction:column;gap:2px;min-height:24px}
   .ev .et{font-size:12px;font-weight:700;line-height:1.15;letter-spacing:-.01em;overflow:hidden}
   .ev .em{font-family:var(--mono);font-size:10px;opacity:.92;line-height:1.2;overflow:hidden}
@@ -18058,8 +18061,20 @@ function renderTimetable(){
     if(conf.size){strip.className='conflict-strip show';strip.innerHTML=`⚠ <strong>${conf.size} sessions clash</strong> on this day — outlined in red. The higher-priority one sits on the left; tap any session to set High / Med / Low.`;}
     else{strip.className='conflict-strip';strip.innerHTML='';}
   }
+  updateNowLine();
   renderLegend(evs);
 }
+function pdtNow(){const d=new Date(Date.now()-7*3600*1000);return{iso:d.toISOString().slice(0,10),min:d.getUTCHours()*60+d.getUTCMinutes()};}
+function updateNowLine(){
+  const lane=document.getElementById('lane');if(!lane)return;
+  let nl=lane.querySelector('.nowline');
+  const {iso,min}=pdtNow();
+  if(iso!==activeDay||min<GRID_START||min>=GRID_END){if(nl)nl.remove();return;}
+  if(!nl){nl=document.createElement('div');nl.className='nowline';nl.innerHTML='<span class="nowdot"></span><span class="nowlbl mono"></span>';lane.appendChild(nl);}
+  nl.style.top=((min-GRID_START)*PXPERMIN)+'px';
+  nl.querySelector('.nowlbl').textContent=fmtTime(min);
+}
+setInterval(updateNowLine,30000);
 function renderLegend(evs){
   const leg=document.getElementById('legend');
   const progs=[...new Set(evs.map(e=>e.program))];
