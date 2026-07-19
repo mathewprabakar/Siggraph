@@ -17778,7 +17778,7 @@ function saveState(){
 }
 function updateSaveNote(){
   const n=document.getElementById('saveNote');
-  n.textContent=storageOK?(picked.size?('Saved · '+picked.size+' picked · '+catalog.length+' in catalog'):('Saved · '+catalog.length+' in catalog')):'Storage off — use Save my picks';
+  n.textContent=storageOK?(picked.size?('Saved · '+picked.size+' picked · '+catalog.length+' in catalog'):('Saved · '+catalog.length+' in catalog')):'Storage off — use Export picks';
   n.style.color=storageOK?'':'var(--amber)';
 }
 
