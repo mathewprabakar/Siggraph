@@ -202,9 +202,8 @@
     <div class="head-tools">
       <span class="save-note" id="saveNote">Saved locally</span>
       <button class="tbtn" id="btnFloorPlan" title="Browse the LA Convention Center floor plan">🗺 Floor plan</button>
-      <button class="tbtn" id="btnRefresh" title="Fetch the latest program from the SIGGRAPH site">↻ Refresh from website</button>
       <button class="tbtn" id="btnLoadFile" title="Load a saved picks/catalog file">Load</button>
-      <button class="tbtn" id="btnExportJson">Save my picks</button>
+      <button class="tbtn" id="btnExportJson" title="Download a backup of your picks as a .json file">Export picks</button>
       <button class="tbtn solid" id="btnIcs">Add to calendar</button>
       <button class="tbtn danger" id="btnClear">Clear</button>
       <input type="file" id="fileInput" accept=".json" hidden>
@@ -236,7 +235,7 @@
           <details class="fgroup" data-group="reg"><summary><span class="caret">▸</span>Registration Category<span class="n"></span></summary><div class="checklist"></div></details>
         </div>
         <div class="adder" id="adderD">
-          <p class="paste-hint">Paste a session block copied from the SIGGRAPH schedule, press <strong>Read paste</strong>, tidy up, then Add. (The full program is already built in — use <strong>Refresh from website</strong> to pull the latest.)</p>
+          <p class="paste-hint">Paste a session block copied from the SIGGRAPH schedule, press <strong>Read paste</strong>, tidy up, then Add. (The full program is already built in — run <strong>refresh_siggraph.py</strong> and use <strong>Load</strong> to pull the latest.)</p>
           <div class="form-grid">
             <div class="full"><label>Paste from schedule</label><textarea id="pasteBox" placeholder="e.g.  'Battlefield 6': ... 11:30am - 12:00pm PDT Sunday, 19 July 2026 411 Theatre"></textarea></div>
             <div class="full" style="display:flex;gap:8px"><button class="tbtn" id="btnParse" type="button">Read paste</button><button class="tbtn" id="btnClearForm" type="button">Reset fields</button></div>
@@ -4144,65 +4143,6 @@ function importJSON(file){
   r.readAsText(file);
 }
 
-/* ---- live refresh: fetch + parse the SIGGRAPH schedule ---- */
-const PLURAL_MAP={'Course':'Courses','Technical Paper':'Technical Papers','Industry Session':'Industry Sessions','Poster':'Posters','Production Session':'Production Sessions','Technical Workshop':'Technical Workshops','Stage Session':'Stage Sessions',"Educator's Day Session":"Educator's Day Sessions",'Panel':'Panels','Keynote Speaker':'Keynote Speakers','Art Paper':'Art Papers'};
-function pdtFields(utcStr){
-  const ms=Date.parse(utcStr)-7*3600000; const d=new Date(ms);
-  return {iso:d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate()), min:d.getUTCHours()*60+d.getUTCMinutes()};
-}
-function parseScheduleHTML(htmlText){
-  const doc=new DOMParser().parseFromString(htmlText,'text/html');
-  const items=doc.querySelectorAll('.agenda-item');
-  const out=[];
-  items.forEach(it=>{
-    const titleEl=it.querySelector('.presentation-title'); if(!titleEl) return;
-    const t=titleEl.textContent.trim(); if(!t) return;
-    const st=it.querySelector('.dateTimeInfo.start-time'); const su=st&&st.getAttribute('utc_time'); if(!su) return;
-    const en=it.querySelector('.dateTimeInfo.end-time'); const eu=en&&en.getAttribute('utc_time');
-    const S=pdtFields(su); let emin=S.min+30;
-    if(eu){const E=pdtFields(eu); emin=E.min+(E.iso>S.iso?1440:0);}
-    let etypes=[]; it.querySelectorAll('.small-etypes .event-type-name').forEach(e=>{const v=e.textContent.trim();if(v&&!etypes.includes(v))etypes.push(v);});
-    if(!etypes.length){const pt=it.querySelector('.presentation-type'); etypes=[pt?pt.textContent.trim():'Session'];}
-    const programs=etypes.map(x=>PLURAL_MAP[x]||x);
-    const grp=cls=>{const g=it.querySelector('.'+cls); if(!g)return []; const a=[]; g.querySelectorAll('.program-track').forEach(d=>{const v=d.textContent.trim();if(v&&!a.includes(v))a.push(v);}); return a;};
-    const locEl=it.querySelector('.presentation-location');
-    const linkEl=titleEl.querySelector('a');
-    let url=linkEl?linkEl.getAttribute('href')||'':'';
-    if(!url&&linkEl){
-      const m=(linkEl.getAttribute('onclick')||'').match(/toggle_session_contents\('(sess\d+)'\)/);
-      if(m)url=`https://s2026.conference-schedule.org/?post_type=page&p=16&sess=${m[1]}`;
-    }
-    out.push({t,program:programs[0],programs,day:S.iso,s:fmtTime(S.min),e:fmtTime(Math.min(emin,1439)),room:locEl?locEl.textContent.trim():'',url,ia:grp('interest-area'),kw:grp('keyword'),reg:grp('registration-category')});
-  });
-  return out;
-}
-async function doRefresh(){
-  const btn=document.getElementById('btnRefresh'); const orig=btn.textContent;
-  btn.disabled=true; btn.textContent='↻ Refreshing…'; toast('Fetching the latest schedule…');
-  // Direct, first-party requests only (no third-party proxies). /search-program is
-  // server-rendered and carries the data; the main page is the fallback. A browser
-  // will still block these cross-origin from a local file -- see the failure note.
-  const attempts=[
-    'https://s2026.conference-schedule.org/search-program',
-    'https://s2026.conference-schedule.org/'
-  ];
-  for(const u of attempts){
-    try{
-      const res=await fetch(u,{redirect:'follow'});
-      if(!res.ok) continue;
-      const html=await res.text();
-      const parsed=parseScheduleHTML(html);
-      if(parsed.length>=50){
-        catalog=parsed.map(norm); saveState(); buildFilterGroups(); renderCatalog(); renderTimetable(); syncDayTabs();
-        btn.disabled=false; btn.textContent=orig;
-        toast('Updated — '+parsed.length+' sessions from the website');
-        return;
-      }
-    }catch(e){/* try next source */}
-  }
-  btn.disabled=false; btn.textContent=orig;
-  toast("Live refresh is blocked in-browser (cross-origin). Run refresh_siggraph.py, then use Load. Built-in program still active.");
-}
 
 /* ---- utils ---- */
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -4236,7 +4176,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   document.getElementById('btnIcs').onclick=exportICS;
   document.getElementById('btnExportJson').onclick=exportJSON;
-  document.getElementById('btnRefresh').onclick=doRefresh;
   fpBuildOverlay(1);
   fpBuildOverlay(2);
   document.getElementById('btnFloorPlan').onclick=()=>openFloorPlan('');
