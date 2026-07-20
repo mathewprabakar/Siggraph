@@ -384,6 +384,14 @@ function renderTimetable(){
   if(!evs.length){strip.className='conflict-strip';strip.innerHTML='';}
   updateNowLine();
   renderLegend(evs);
+  syncDesktopPanelHeights();
+}
+function syncDesktopPanelHeights(){
+  const browse=document.querySelector('#browseCol .panel');
+  const day=document.querySelector('#dayCol .panel');
+  if(!browse||!day)return;
+  if(window.matchMedia('(max-width:920px)').matches){browse.style.height='';return;}
+  browse.style.height=day.offsetHeight+'px';
 }
 function pdtNow(){const d=new Date(Date.now()-7*3600*1000);return{iso:d.toISOString().slice(0,10),min:d.getUTCHours()*60+d.getUTCMinutes()};}
 function updateNowLine(){
@@ -904,7 +912,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   const setView=w=>{swB.setAttribute('aria-pressed',String(w==='browse'));swD.setAttribute('aria-pressed',String(w==='day'));document.getElementById('browseCol').dataset.hidden=String(w!=='browse');document.getElementById('dayCol').dataset.hidden=String(w!=='day');};
   swB.onclick=()=>setView('browse');swD.onclick=()=>setView('day');
   if(window.matchMedia('(max-width:920px)').matches)setView('browse');
-  window.addEventListener('resize',()=>{const mobile=window.matchMedia('(max-width:920px)').matches;if(!mobile){document.getElementById('browseCol').dataset.hidden='false';document.getElementById('dayCol').dataset.hidden='false';}});
+  window.addEventListener('resize',()=>{const mobile=window.matchMedia('(max-width:920px)').matches;if(!mobile){document.getElementById('browseCol').dataset.hidden='false';document.getElementById('dayCol').dataset.hidden='false';}syncDesktopPanelHeights();});
 });
 
 /* Minimal surface for the check_page.py smoke tests (ES module scope hides the app's internals from the global namespace). */

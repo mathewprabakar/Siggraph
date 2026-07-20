@@ -10,6 +10,8 @@
     --mono: ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
     --sans: "Luxe Uno","Avenir Next","Century Gothic",Futura,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --shadow: 0 1px 2px rgba(42,66,73,.06), 0 6px 18px rgba(42,66,73,.08);
+    --scroll-thumb:color-mix(in srgb,var(--teal) 42%,var(--line-strong));
+    --scroll-thumb-hover:var(--teal);
   }
   /* ---- Light theme: the app's original pre-SIGGRAPH palette ---- */
   :root[data-theme="light"]{
@@ -96,7 +98,7 @@
   .tbtn.danger-fill:hover{background:#6f1e2b;border-color:#6f1e2b;color:#fff}
   .save-note{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);white-space:nowrap}
 
-  .wrap{max-width:1320px;margin:0 auto;padding:18px;display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:18px;align-items:start}
+  .wrap{max-width:1320px;margin:0 auto;padding:18px;display:grid;grid-template-columns:minmax(0,456px) minmax(0,1fr);gap:18px;align-items:start}
   .col-head{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 10px}
   .col-head h2{margin:0;font-size:13px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
   .col-head .count{font-family:var(--mono);font-size:12px;color:var(--teal);font-weight:600}
@@ -246,6 +248,20 @@
   .share-option span{display:block;font-size:11.5px;font-weight:600;color:var(--ink)}
   .share-option small{display:block;font-size:10.5px;color:var(--ink-soft);line-height:1.25;margin-top:2px}
 
+  /* guided tutorial */
+  .tour-overlay{display:none;position:fixed;inset:0;z-index:120;pointer-events:none}
+  .tour-overlay.show{display:block}
+  .tour-scrim{position:absolute;inset:0;background:rgba(20,31,35,.52);pointer-events:auto}
+  .tour-highlight{position:relative;z-index:121;pointer-events:none;box-shadow:0 0 0 4px rgba(255,255,255,.96),0 0 0 8px rgba(29,144,163,.7),0 12px 36px rgba(0,0,0,.34)!important}
+  .tour-card{position:absolute;z-index:122;width:min(330px,calc(100vw - 28px));background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 14px 44px rgba(20,31,35,.32);padding:16px;pointer-events:auto}
+  .tour-kicker{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-ink);font-weight:700;margin-bottom:5px}
+  .tour-card h3{margin:0 0 6px;font-size:16px;color:var(--ink)}
+  .tour-card p{margin:0;color:var(--ink-soft);font-size:13px;line-height:1.45}
+  .tour-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px}
+  .tour-nav{display:flex;gap:7px}
+  .tour-exit{border:none;background:none;color:var(--ink-soft);font-size:12.5px;font-weight:700;text-decoration:underline;text-underline-offset:2px;padding:7px 0}
+  .tour-exit:hover{color:var(--wine)}
+
   /* floor plan modal */
   .fp-overlay{display:none;position:fixed;inset:0;background:rgba(30,46,51,.58);z-index:90;align-items:center;justify-content:center;padding:20px}
   .fp-overlay.show{display:flex}
@@ -278,6 +294,53 @@
   .confirm-dialog p{margin:0;color:var(--ink-soft);font-size:13px;line-height:1.45}
   .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
 
+  .catalog,
+  .grid-scroll,
+  .checklist,
+  .day-tabs,
+  .fp-body{
+    scrollbar-width:thin;
+    scrollbar-color:var(--scroll-thumb) transparent;
+  }
+  .catalog::-webkit-scrollbar,
+  .grid-scroll::-webkit-scrollbar,
+  .checklist::-webkit-scrollbar,
+  .day-tabs::-webkit-scrollbar,
+  .fp-body::-webkit-scrollbar{width:10px;height:10px}
+  .catalog::-webkit-scrollbar-track,
+  .grid-scroll::-webkit-scrollbar-track,
+  .checklist::-webkit-scrollbar-track,
+  .day-tabs::-webkit-scrollbar-track,
+  .fp-body::-webkit-scrollbar-track{background:transparent}
+  .catalog::-webkit-scrollbar-thumb,
+  .grid-scroll::-webkit-scrollbar-thumb,
+  .checklist::-webkit-scrollbar-thumb,
+  .day-tabs::-webkit-scrollbar-thumb,
+  .fp-body::-webkit-scrollbar-thumb{
+    background:var(--scroll-thumb);
+    background-clip:content-box;
+    border:3px solid transparent;
+    border-radius:999px;
+  }
+  .catalog::-webkit-scrollbar-thumb:hover,
+  .grid-scroll::-webkit-scrollbar-thumb:hover,
+  .checklist::-webkit-scrollbar-thumb:hover,
+  .day-tabs::-webkit-scrollbar-thumb:hover,
+  .fp-body::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hover);background-clip:content-box}
+
+  @media (min-width:921px){
+    .wrap{align-items:stretch}
+    #browseCol,
+    #dayCol{display:flex;flex-direction:column;min-height:0}
+    #browseCol .panel{display:flex;flex-direction:column;overflow:hidden}
+    #dayCol .panel{display:flex;flex-direction:column}
+    .browse-controls,
+    .day-tabs,
+    .conflict-strip,
+    .legend{flex:0 0 auto}
+    .catalog{flex:1 1 auto;max-height:none;min-height:0}
+  }
+
   @media (max-width:920px){
     .wrap{grid-template-columns:1fr;gap:0}
     .switch{display:flex;position:sticky;top:0;z-index:30;gap:0;margin:0 0 14px;background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden;box-shadow:var(--shadow);grid-column:1/-1}
@@ -291,4 +354,5 @@
     .catalog{max-height:none}
     .head-inner{padding:10px 14px} .brand h1{font-size:17px} .wrap{padding:14px}
     .theme-foot{padding:6px 14px 26px}
+    .tour-card{left:14px!important;right:auto!important;top:auto!important;bottom:14px!important}
   }
