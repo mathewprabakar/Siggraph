@@ -18,8 +18,10 @@ Two ways to use it
      pip install playwright && playwright install chromium
      python refresh_siggraph.py --render
 
-Either way it writes  siggraph2026-catalog.json , which you load with the app's
-"Load" button.  Requires:  pip install beautifulsoup4
+Either way it writes  siggraph2026-catalog.json , which the app fetches at startup
+(it's the single source of truth for the catalog). Commit the regenerated JSON and
+the app picks it up on next load; the "Load" button still works for ad-hoc files.
+Requires:  pip install beautifulsoup4
 """
 import sys, json, argparse, re
 from datetime import datetime, timedelta, timezone
