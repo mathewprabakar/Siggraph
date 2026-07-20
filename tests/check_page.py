@@ -5,7 +5,7 @@ Run this after any change to index.html:
 
     uv sync --extra test
     uv run playwright install chromium webkit   # one-time
-    uv run check_page.py
+    uv run tests/check_page.py
 
 Checks, on both Chromium and WebKit (WebKit is Safari's engine — the closest
 automated proxy to real iOS behavior):
@@ -28,10 +28,16 @@ from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
-REPO_DIR = Path(__file__).parent.resolve()
+REPO_DIR = Path(__file__).parent.parent.resolve()
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def handle_one_request(self) -> None:
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            pass
+
     def log_message(self, *args) -> None:  # silence per-request logging
         pass
 

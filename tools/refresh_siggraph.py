@@ -12,13 +12,13 @@ Two ways to use it
 1) From a saved page (no browser dependency, 100% reliable):
      - Open https://s2026.conference-schedule.org/  in your browser
      - Save Page As -> "Webpage, HTML Only"
-     - python refresh_siggraph.py "Full Schedule - SIGGRAPH 2026 ....htm"
+     - python tools/refresh_siggraph.py "Full Schedule - SIGGRAPH 2026 ....htm"
 
 2) Fully automated (renders the live page for you):
      pip install playwright && playwright install chromium
-     python refresh_siggraph.py --render
+     python tools/refresh_siggraph.py --render
 
-Either way it writes  siggraph2026-catalog.json , which the app fetches at startup
+Either way it writes  assets/data/siggraph2026-catalog.json , which the app fetches at startup
 (it's the single source of truth for the catalog). Commit the regenerated JSON and
 the app picks it up on next load.
 Requires:  pip install beautifulsoup4
@@ -149,7 +149,7 @@ def main():
     ap.add_argument('--render', metavar='URL', nargs='?',
                     const='https://s2026.conference-schedule.org/',
                     help="fetch & render the live page via Playwright (default: main schedule)")
-    ap.add_argument('-o', '--output', default='siggraph2026-catalog.json')
+    ap.add_argument('-o', '--output', default='assets/data/siggraph2026-catalog.json')
     args = ap.parse_args()
 
     if args.render:

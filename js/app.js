@@ -116,12 +116,12 @@ const RENDER_CAP=500;
 let T_ROOM=deriveRooms(catalog);
 function deriveRooms(list){return [...new Set(list.map(c=>c.room).filter(Boolean))].sort((a,b)=>a.localeCompare(b));}
 
-/* The full session catalog lives in siggraph2026-catalog.json (the same file refresh_siggraph.py
+/* The full session catalog lives in assets/data/siggraph2026-catalog.json (the same file refresh_siggraph.py
    writes) and is fetched at startup so there's a single source of truth. SEED above is a tiny
    built-in fallback used only if the fetch fails (e.g. opened without a server). */
 async function loadCatalog(){
   try{
-    const res=await fetch('siggraph2026-catalog.json',{cache:'no-cache'});
+    const res=await fetch('assets/data/siggraph2026-catalog.json',{cache:'no-cache'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
     const arr=Array.isArray(data)?data:data.catalog;
@@ -492,7 +492,7 @@ function showLocation(roomStr,anchor){
 
 /* ---- floor plan: LA Convention Center ----
    Uses the official SIGGRAPH 2026 venue map SVGs (s2026.conference-schedule.org/map/).
-   Each level (~250 KB) is fetched from lacc-level{1,2}.svg only when the map is first
+   Each level (~250 KB) is fetched from assets/maps/lacc-level{1,2}.svg only when the map is first
    opened, so it never loads for the many visitors who never open it. Those SVGs ship as
    outlined vector art with no machine-readable room labels, so the highlight rects below
    were positioned by probing the map's own paths in a real browser (getBBox() on the path
@@ -556,7 +556,7 @@ async function ensureFpLevel(n){
   if(fpBuilt[n])return true;
   const wrap=document.getElementById('fpLevel'+n+'Wrap');
   try{
-    const res=await fetch('lacc-level'+n+'.svg',{cache:'force-cache'});
+    const res=await fetch('assets/maps/lacc-level'+n+'.svg',{cache:'force-cache'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     wrap.innerHTML=await res.text();
     fpBuildOverlay(n);
