@@ -48,9 +48,6 @@
   :root[data-theme="dark"] .add-btn,
   :root[data-theme="dark"] .switch button,
   :root[data-theme="dark"] .search,
-  :root[data-theme="dark"] .form-grid input,
-  :root[data-theme="dark"] .form-grid select,
-  :root[data-theme="dark"] .form-grid textarea,
   :root[data-theme="dark"] .theme-select{background-color:#232c31}
   :root[data-theme="dark"] .chip[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:#07171b}
   :root[data-theme="dark"] .cat-item.picked .add-btn{border-color:var(--teal)}
@@ -150,16 +147,6 @@
   .cat-item.picked .add-btn{background:var(--teal-bg);border-color:#a9cdd2;color:var(--teal-ink)}
   .empty{padding:26px 16px;text-align:center;color:var(--ink-soft);font-size:13px}
   .more-note{padding:10px 14px;text-align:center;font-size:12px;color:var(--ink-soft);font-family:var(--mono);border-top:1px solid var(--line)}
-
-  .adder{border-top:1px solid var(--line);padding:12px;display:none}
-  .adder.open{display:block}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-  .form-grid .full{grid-column:1/3}
-  .form-grid label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:3px}
-  .form-grid input,.form-grid select,.form-grid textarea{width:100%;padding:8px 9px;border:1px solid var(--line-strong);border-radius:8px;font-size:13px;font-family:var(--sans)}
-  .form-grid textarea{font-family:var(--mono);font-size:12px;resize:vertical;min-height:64px}
-  .form-actions{display:flex;gap:8px;margin-top:10px}
-  .paste-hint{font-size:11.5px;color:var(--ink-soft);margin:6px 0 0}
 
   .day-tabs{display:flex;gap:6px;padding:12px 12px 0;flex-wrap:wrap}
   .day-tab{position:relative;border:1px solid var(--line-strong);background:#fff;border-radius:10px 10px 0 0;padding:8px 12px 10px;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink-soft);border-bottom:none;min-width:64px;text-align:center}

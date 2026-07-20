@@ -139,14 +139,19 @@ function loadState(){
     const raw=localStorage.getItem(STORE_KEY);
     if(raw){
       const data=JSON.parse(raw);
-      if(Array.isArray(data.catalog)&&data.catalog.length) catalog=data.catalog.map(norm);
-      (data.picked||[]).forEach(ev=>{const n=norm(ev);picked.set(n.id,n);});
+      const byId=new Map(catalog.map(c=>[c.id,c]));
+      const picks=Array.isArray(data.picks)?data.picks:(data.picked||[]);
+      picks.forEach(item=>{
+        const id=typeof item==='string'?item:item.id;
+        const c=byId.get(id);
+        if(c){const n=norm({...c,pr:item.pr||2});picked.set(n.id,n);}
+      });
     }
   }catch(e){storageOK=false;}
   updateSaveNote();
 }
 function saveState(){
-  try{localStorage.setItem(STORE_KEY,JSON.stringify({catalog:catalog,picked:[...picked.values()]}));storageOK=true;}
+  try{localStorage.setItem(STORE_KEY,JSON.stringify({v:3,picks:[...picked.values()].map(e=>({id:e.id,pr:e.pr||2}))}));storageOK=true;}
   catch(e){storageOK=false;}
   updateSaveNote();
 }
@@ -233,10 +238,6 @@ function buildDayControls(){
     b.onclick=()=>{activeDay=d.iso;renderTimetable();syncDayTabs();};
     tabs.appendChild(b);
   });
-  const fday=document.getElementById('fDay');
-  DAYS.forEach(d=>{const o=document.createElement('option');o.value=d.iso;o.textContent=`${d.wd} ${d.d} Jul`;fday.appendChild(o);});
-  const dl=document.getElementById('typeList');
-  T_PROGRAM.forEach(p=>{const o=document.createElement('option');o.value=p;dl.appendChild(o);});
 }
 
 /* ---- browse list ---- */
@@ -605,24 +606,6 @@ async function openFloorPlan(roomStr){
 }
 function closeFloorPlan(){document.getElementById('fpOverlay').classList.remove('show');}
 
-/* ---- paste parser ---- */
-function parsePaste(text){
-  const raw=text.replace(/\s+/g,' ').trim();if(!raw)return null;
-  const re=/(\d{1,2}(?::\d{2})?\s*[ap]m)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*[ap]m)\s*(?:PDT|PST|PT)?\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),?\s*(\d{1,2})\s+July\s+2026\s*(.*)/i;
-  const m=raw.match(re);if(!m)return null;
-  const s=m[1].replace(/\s+/g,''),e=m[2].replace(/\s+/g,'');
-  const dnum=parseInt(m[4],10);const dayObj=DAYS.find(d=>d.d===dnum);const day=dayObj?dayObj.iso:DAYS[0].iso;
-  let title=raw.slice(0,m.index).trim();let program='';
-  for(const kt of T_PROGRAM.concat(["Technical Paper","Production Session","Poster","Course","Panel","Talk"])){
-    if(title.toLowerCase().startsWith(kt.toLowerCase())){program=kt;title=title.slice(kt.length).trim();break;}
-  }
-  const progMap={"Technical Paper":"Technical Papers","Production Session":"Production Sessions","Poster":"Posters","Course":"Courses","Panel":"Panels","Talk":"Talks"};
-  program=progMap[program]||program;
-  let tail=(m[5]||'').trim();
-  tail=tail.split(new RegExp(T_IA.concat(T_REG,["Description","Experience","Discover"]).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'i'))[0].trim();
-  return {title,program,day,s,e,room:tail.slice(0,60).trim()};
-}
-
 /* ---- ICS ---- */
 function pad(n){return String(n).padStart(2,'0');}
 function icsStamp(iso,mins){const [Y,M,D]=iso.split('-').map(Number);const dt=new Date(Date.UTC(Y,M-1,D,Math.floor(mins/60)+7,mins%60,0));return dt.getUTCFullYear()+pad(dt.getUTCMonth()+1)+pad(dt.getUTCDate())+'T'+pad(dt.getUTCHours())+pad(dt.getUTCMinutes())+'00Z';}
@@ -649,12 +632,18 @@ function importJSON(file){
   r.onload=()=>{
     try{
       const data=JSON.parse(r.result);
-      let msg=[];
-      const arr=Array.isArray(data)?data:(data.catalog||data.sessions);
-      if(Array.isArray(arr)&&arr.length){catalog=arr.map(norm);msg.push(catalog.length+' sessions in catalog');}
-      if(Array.isArray(data.picked)&&data.picked.length){data.picked.forEach(ev=>{const n=norm(ev);picked.set(n.id,n);});msg.push(data.picked.length+' picks');}
-      saveState();buildFilterGroups();renderCatalog();renderTimetable();syncDayTabs();
-      toast(msg.length?('Loaded '+msg.join(' + ')):'Nothing importable found in that file');
+      const byId=new Map(catalog.map(c=>[c.id,c]));
+      const picks=Array.isArray(data.picks)?data.picks:(data.picked||[]);
+      let loaded=0;
+      if(Array.isArray(picks)){
+        picks.forEach(item=>{
+          const id=typeof item==='string'?item:item.id;
+          const c=byId.get(id);
+          if(c){const n=norm({...c,pr:item.pr||2});picked.set(n.id,n);loaded++;}
+        });
+      }
+      saveState();renderCatalog();renderTimetable();syncDayTabs();
+      toast(loaded?('Loaded '+loaded+' picks'):'Nothing importable found in that file');
     }catch(e){toast('Could not read that file');}
   };
   r.readAsText(file);
@@ -709,19 +698,6 @@ function toastWithUndo(msg,onUndo){
   toastT=setTimeout(()=>t.classList.remove('show','with-action'),5000);
 }
 
-/* ---- manual add ---- */
-function addCustomFromForm(){
-  const t=document.getElementById('fTitle').value.trim();
-  const sRaw=document.getElementById('fStart').value.trim(),eRaw=document.getElementById('fEnd').value.trim();
-  const s=parseTime(sRaw);if(!t){toast('Add a title first');return;}if(s==null){toast('Check the start time (e.g. 2:00pm)');return;}
-  const n=norm({t,program:document.getElementById('fType').value.trim()||'Session',day:document.getElementById('fDay').value,s:sRaw,e:eRaw||fmtTime(s+30),room:document.getElementById('fRoom').value.trim(),pr:2});
-  picked.set(n.id,n);
-  if(!catalog.find(c=>c.id===n.id))catalog.push(n);
-  activeDay=n.day;saveState();refreshFilterCounts();renderCatalog();renderTimetable();syncDayTabs();
-  ['fTitle','fStart','fEnd','fRoom','pasteBox'].forEach(id=>document.getElementById(id).value='');
-  toast('Added “'+t.slice(0,30)+(t.length>30?'…':'')+'”');
-}
-
 /* ---- wire up ---- */
 document.addEventListener('DOMContentLoaded',async ()=>{
   await loadCatalog();
@@ -734,7 +710,6 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   if(themeSel){themeSel.value=curTheme();themeSel.onchange=()=>applyTheme(themeSel.value);}
   document.getElementById('search').addEventListener('input',e=>{searchQ=e.target.value;renderCatalog();});
   document.getElementById('ftoggle').onclick=()=>{const p=document.getElementById('filterPanel');const open=p.classList.toggle('open');document.getElementById('ftoggle').setAttribute('aria-expanded',String(open));};
-  document.getElementById('btnAddSession').onclick=()=>{const p=document.getElementById('adderD');const open=p.classList.toggle('open');document.getElementById('btnAddSession').setAttribute('aria-expanded',String(open));if(open)p.scrollIntoView({block:'nearest',behavior:'smooth'});};
   document.getElementById('clearFilters').onclick=()=>{Object.values(F).forEach(s=>s.clear());filterDay='';syncDayChips();document.querySelectorAll('.fgroup input').forEach(cb=>cb.checked=false);renderCatalog();syncFilterCounts();toast('Filters cleared');};
 
   document.getElementById('btnIcs').onclick=exportICS;
@@ -749,14 +724,6 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   document.getElementById('btnLoadFile').onclick=()=>document.getElementById('fileInput').click();
   document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])importJSON(e.target.files[0]);e.target.value='';});
   document.getElementById('btnClear').onclick=()=>{if(!picked.size){toast('Timetable is already empty');return;}if(confirm('Remove all picked sessions? Your browse catalog stays.')){picked.clear();saveState();renderCatalog();renderTimetable();syncDayTabs();toast('Cleared picks');}};
-  document.getElementById('btnAddCustom').onclick=addCustomFromForm;
-  document.getElementById('btnClearForm').onclick=()=>{['fTitle','fStart','fEnd','fRoom','fType','pasteBox'].forEach(id=>document.getElementById(id).value='');};
-  document.getElementById('btnParse').onclick=()=>{
-    const p=parsePaste(document.getElementById('pasteBox').value);
-    if(!p){toast('Could not find a time + date in that paste');return;}
-    document.getElementById('fTitle').value=p.title;document.getElementById('fType').value=p.program;document.getElementById('fDay').value=p.day;document.getElementById('fStart').value=p.s;document.getElementById('fEnd').value=p.e;document.getElementById('fRoom').value=p.room;
-    toast('Read — check the fields, then Add');
-  };
 
   const swB=document.getElementById('swBrowse'),swD=document.getElementById('swDay');
   const setView=w=>{swB.setAttribute('aria-pressed',String(w==='browse'));swD.setAttribute('aria-pressed',String(w==='day'));document.getElementById('browseCol').dataset.hidden=String(w!=='browse');document.getElementById('dayCol').dataset.hidden=String(w!=='day');};

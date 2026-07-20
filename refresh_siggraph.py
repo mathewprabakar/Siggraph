@@ -20,7 +20,7 @@ Two ways to use it
 
 Either way it writes  siggraph2026-catalog.json , which the app fetches at startup
 (it's the single source of truth for the catalog). Commit the regenerated JSON and
-the app picks it up on next load; the "Load" button still works for ad-hoc files.
+the app picks it up on next load.
 Requires:  pip install beautifulsoup4
 """
 import sys, json, argparse, re
@@ -175,7 +175,7 @@ def main():
         by_day[c['day']] = by_day.get(c['day'], 0) + 1
     print(f"Wrote {len(catalog)} sessions to {args.output}")
     print("By day:", {k: by_day[k] for k in sorted(by_day)})
-    print('Now open the app and click "Load", then pick this file.')
+    print("Commit the updated JSON; the app fetches it automatically on next load.")
 
 
 if __name__ == '__main__':
