@@ -42,18 +42,16 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def _start_server() -> tuple[socketserver.TCPServer, int]:
+def _start_server() -> tuple[socketserver.TCPServer, threading.Thread, str]:
     """Serve the repo over HTTP. The app now fetches catalog/SVG files at runtime,
     so it must be served (as it is on GitHub Pages), not opened via file://."""
     handler = functools.partial(_QuietHandler, directory=str(REPO_DIR))
     httpd = socketserver.ThreadingTCPServer(("127.0.0.1", 0), handler)
     httpd.daemon_threads = True
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    return httpd, httpd.server_address[1]
-
-
-_httpd, _port = _start_server()
-INDEX_URL = f"http://127.0.0.1:{_port}/index.html"
+    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    server_thread.start()
+    index_url = f"http://127.0.0.1:{httpd.server_address[1]}/index.html"
+    return httpd, server_thread, index_url
 
 VIEWPORTS = [
     ("phone-android", 360, 800),
@@ -74,13 +72,13 @@ def record(ok: bool, label: str, detail: str = "") -> None:
         failures.append(f"{label}: {detail}" if detail else label)
 
 
-def fresh_page(context) -> tuple[Page, list[str]]:
+def fresh_page(context, index_url: str) -> tuple[Page, list[str]]:
     """Load index.html with a clean localStorage and a live console/page-error log."""
     page = context.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
-    page.goto(INDEX_URL)
+    page.goto(index_url)
     page.evaluate("localStorage.clear()")
     page.reload()
     # The catalog now loads asynchronously via fetch(); wait for it before checking.
@@ -88,11 +86,11 @@ def fresh_page(context) -> tuple[Page, list[str]]:
     return page, errors
 
 
-def check_layout(engine: str, browser) -> None:
+def check_layout(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: layout / overflow / console errors ==")
     for name, w, h in VIEWPORTS:
         context = browser.new_context(viewport={"width": w, "height": h})
-        page, errors = fresh_page(context)
+        page, errors = fresh_page(context, index_url)
         overflow = page.evaluate(
             "document.documentElement.scrollWidth - document.documentElement.clientWidth"
         )
@@ -102,10 +100,10 @@ def check_layout(engine: str, browser) -> None:
         context.close()
 
 
-def check_session_flow(engine: str, browser) -> None:
+def check_session_flow(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: add / remove / undo session flow ==")
     context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
-    page, errors = fresh_page(context)
+    page, errors = fresh_page(context, index_url)
 
     picked = page.evaluate("""
         () => {
@@ -166,10 +164,10 @@ def check_session_flow(engine: str, browser) -> None:
     context.close()
 
 
-def check_shared_schedule_link(engine: str, browser) -> None:
+def check_shared_schedule_link(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: shared schedule link ==")
     context = browser.new_context(viewport={"width": 390, "height": 844})
-    page, errors = fresh_page(context)
+    page, errors = fresh_page(context, index_url)
 
     shared = page.evaluate("""
         () => {
@@ -202,10 +200,10 @@ def check_shared_schedule_link(engine: str, browser) -> None:
     context.close()
 
 
-def check_floorplan(engine: str, browser) -> None:
+def check_floorplan(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: floor plan (lazy-loaded maps) ==")
     context = browser.new_context(viewport={"width": 1280, "height": 800})
-    page, errors = fresh_page(context)
+    page, errors = fresh_page(context, index_url)
 
     svg_reqs: list[str] = []
     page.on("request", lambda r: svg_reqs.append(r.url) if r.url.endswith(".svg") else None)
@@ -246,27 +244,33 @@ def check_floorplan(engine: str, browser) -> None:
     context.close()
 
 
-def main() -> None:
-    with sync_playwright() as p:
-        for engine in ENGINES:
-            browser = getattr(p, engine).launch()
-            try:
-                check_layout(engine, browser)
-                check_session_flow(engine, browser)
-                check_shared_schedule_link(engine, browser)
-                check_floorplan(engine, browser)
-            finally:
-                browser.close()
+def main() -> int:
+    httpd, server_thread, index_url = _start_server()
+    try:
+        with sync_playwright() as p:
+            for engine in ENGINES:
+                browser = getattr(p, engine).launch()
+                try:
+                    check_layout(engine, browser, index_url)
+                    check_session_flow(engine, browser, index_url)
+                    check_shared_schedule_link(engine, browser, index_url)
+                    check_floorplan(engine, browser, index_url)
+                finally:
+                    browser.close()
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        server_thread.join(timeout=5)
 
     print("\n" + "=" * 60)
     if failures:
         print(f"{len(failures)} check(s) FAILED:")
         for f in failures:
             print(f"  - {f}")
-        sys.exit(1)
+        return 1
     print("All checks passed.")
-    sys.exit(0)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
