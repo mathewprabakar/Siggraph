@@ -385,6 +385,7 @@ function renderTimetable(){
   grid.innerHTML=html;
   const lane=document.getElementById('lane');
   const totalH=(GRID_END-GRID_START)*PXPERMIN;lane.style.height=totalH+'px';
+  for(let m=GRID_START;m<=GRID_END;m+=60){const l=document.createElement('div');l.className='hourline';l.style.top=((m-GRID_START)*PXPERMIN)+'px';lane.appendChild(l);}
   for(let m=GRID_START+30;m<GRID_END;m+=60){const l=document.createElement('div');l.className='halfline';l.style.top=((m-GRID_START)*PXPERMIN)+'px';lane.appendChild(l);}
 
   if(!evs.length){

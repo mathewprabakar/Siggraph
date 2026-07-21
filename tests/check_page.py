@@ -118,6 +118,14 @@ def check_layout(engine: str, browser, index_url: str) -> None:
         """)
         record(day_tab_rows == 1, f"{name} ({w}x{h}) My Day rail stays on one line",
                f"rows={day_tab_rows}")
+        hour_label_wraps = page.evaluate("""
+            () => [...document.querySelectorAll('.hour .lbl')]
+              .some(el => el.getBoundingClientRect().height > 16)
+        """)
+        record(not hour_label_wraps, f"{name} ({w}x{h}) My Day hour labels stay on one line")
+        hourline_count = page.evaluate("document.querySelectorAll('.lane .hourline').length")
+        record(hourline_count > 0, f"{name} ({w}x{h}) My Day grid shows hour-aligned guide lines",
+               f"hour lines={hourline_count}")
         context.close()
 
 

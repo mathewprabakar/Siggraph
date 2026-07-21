@@ -193,13 +193,15 @@
   .conflict-strip.show{display:flex}
 
   .grid-scroll{overflow:auto;padding:12px}
-  .grid{position:relative;display:grid;grid-template-columns:56px 1fr}
+  .grid{position:relative;display:grid;grid-template-columns:64px 1fr}
   .hours{grid-column:1}
-  .hour{height:64px;position:relative;border-top:1px solid var(--line)}
-  .hour:last-child{border-bottom:1px solid var(--line)}
-  .hour .lbl{position:absolute;top:-8px;left:0;font-family:var(--mono);font-size:11px;color:var(--ink-soft);width:50px;text-align:right;padding-right:8px}
+  .hour{height:64px;position:relative}
+  .hour::after{content:"";position:absolute;top:0;right:0;width:8px;border-top:1px solid var(--line)}
+  .hour:last-child::before{content:"";position:absolute;right:0;bottom:0;width:8px;border-bottom:1px solid var(--line)}
+  .hour .lbl{position:absolute;top:-8px;left:0;font-family:var(--mono);font-size:11px;color:var(--ink-soft);width:58px;text-align:right;padding-right:8px;white-space:nowrap}
   .lane{grid-column:2;position:relative;border-left:1px solid var(--line)}
-  .lane .halfline{position:absolute;left:0;right:0;border-top:1px dashed #ede5d1}
+  .lane .hourline{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+  .lane .halfline{position:absolute;left:0;width:10px;border-top:1px dashed #ede5d1}
   .nowline{position:absolute;left:0;right:0;border-top:2px solid #e03131;z-index:6;pointer-events:none}
   .nowline .nowdot{position:absolute;left:-4px;top:-5px;width:8px;height:8px;border-radius:50%;background:#e03131}
   .nowline .nowlbl{position:absolute;right:2px;top:-17px;font-size:9.5px;font-weight:700;color:#e03131;background:rgba(251,248,238,.9);padding:0 4px;border-radius:4px}
