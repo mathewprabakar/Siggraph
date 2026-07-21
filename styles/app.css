@@ -153,6 +153,16 @@
   .checkitem:hover{background:var(--hover)}
   .checkitem input{accent-color:var(--teal);width:15px;height:15px}
   .checkitem .cnt{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft)}
+  .display-toggle{display:flex;align-items:center;gap:9px;margin:0 0 8px;padding:7px 6px 9px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-soft);cursor:pointer}
+  .display-toggle input{position:absolute;opacity:0;pointer-events:none}
+  .display-toggle .toggle-state{margin-left:auto;font-weight:600;text-align:right;color:var(--ink-soft)}
+  .display-toggle .toggle-switch{width:38px;height:21px;border-radius:999px;background:#b8aa98;border:1px solid #9d8e7c;position:relative;transition:background .15s,border-color .15s,box-shadow .15s;box-shadow:inset 0 1px 2px rgba(42,66,73,.18)}
+  .display-toggle .toggle-switch::after{content:"";position:absolute;top:3px;left:3px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(42,66,73,.35);transition:transform .15s}
+  .display-toggle input:checked ~ .toggle-state{color:var(--teal-ink)}
+  .display-toggle input:checked ~ .toggle-switch{background:var(--teal);border-color:var(--teal);box-shadow:inset 0 1px 2px rgba(42,66,73,.12),0 0 0 2px var(--teal-bg)}
+  .display-toggle input:checked ~ .toggle-switch::after{transform:translateX(17px)}
+  .display-toggle input:focus-visible ~ .toggle-switch{outline:2px solid var(--teal);outline-offset:2px}
+  .display-toggle:hover{background:var(--hover);border-radius:7px}
 
   .catalog{max-height:calc(100vh - 300px);overflow:auto;padding:8px}
   .cat-item{display:flex;gap:10px;padding:10px;border-radius:11px}

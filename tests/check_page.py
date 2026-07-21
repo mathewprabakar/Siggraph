@@ -435,6 +435,62 @@ def check_filter_chips(engine: str, browser, index_url: str) -> None:
     context.close()
 
 
+def check_registration_badge_toggle(engine: str, browser, index_url: str) -> None:
+    print(f"\n== {engine}: registration badge display toggle ==")
+    context = browser.new_context(viewport={"width": 1280, "height": 800})
+    page, errors = fresh_page(context, index_url)
+
+    hidden = page.evaluate("""
+        () => {
+          const toggle = document.getElementById('regBadgeToggle');
+          const before = {
+            checked: toggle?.checked,
+            state: document.querySelector('.display-toggle .toggle-state')?.textContent.trim(),
+            browse: document.querySelectorAll('.cat-item .reg-bubble').length,
+          };
+          toggle.click();
+          const picked = App.catalog.find(c => c.day && c.s0 != null && c.e0 != null && c.reg.length);
+          App.togglePick(picked);
+          document.getElementById('swDay').click();
+          document.querySelector('.ev').click();
+          return {
+            before,
+            checked: toggle.checked,
+            state: document.querySelector('.display-toggle .toggle-state')?.textContent.trim(),
+            stored: localStorage.getItem('s2026-show-reg-badges'),
+            browse: document.querySelectorAll('.cat-item .reg-bubble').length,
+            popup: document.querySelectorAll('#pop .reg-bubble').length,
+          };
+        }
+    """)
+    record(hidden["before"]["checked"] is True and hidden["before"]["state"] == "Show badges",
+           "registration badges are shown by default")
+    record(hidden["before"]["browse"] > 0, "browse shows registration badges before toggle")
+    record(hidden["checked"] is False and hidden["state"] == "Show badges" and hidden["stored"] == "0",
+           "registration badge toggle saves the hidden preference")
+    record(hidden["browse"] == 0, "registration badge toggle hides Browse badges",
+           f"badges={hidden['browse']}")
+    record(hidden["popup"] == 0, "registration badge toggle hides popup badges",
+           f"badges={hidden['popup']}")
+
+    page.reload()
+    page.wait_for_function("window.App && App.catalog.length > 0", timeout=10000)
+    persisted = page.evaluate("""
+        () => ({
+          checked: document.getElementById('regBadgeToggle').checked,
+          state: document.querySelector('.display-toggle .toggle-state')?.textContent.trim(),
+          stored: localStorage.getItem('s2026-show-reg-badges'),
+          browse: document.querySelectorAll('.cat-item .reg-bubble').length,
+        })
+    """)
+    record(persisted["checked"] is False and persisted["state"] == "Show badges" and persisted["stored"] == "0",
+           "registration badge hidden preference persists after reload")
+    record(persisted["browse"] == 0, "reloaded Browse keeps registration badges hidden",
+           f"badges={persisted['browse']}")
+    record(len(errors) == 0, "no console/page errors during registration badge toggle", "; ".join(errors))
+    context.close()
+
+
 def check_theme_switch_preserves_scroll(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: theme switch preserves scroll state ==")
     context = browser.new_context(viewport={"width": 1280, "height": 800})
@@ -639,6 +695,7 @@ def main() -> int:
                     check_shared_schedule_link(engine, browser, index_url)
                     check_large_share_qr(engine, browser, index_url)
                     check_filter_chips(engine, browser, index_url)
+                    check_registration_badge_toggle(engine, browser, index_url)
                     check_theme_switch_preserves_scroll(engine, browser, index_url)
                     check_clear_confirmation(engine, browser, index_url)
                     check_floorplan(engine, browser, index_url)
