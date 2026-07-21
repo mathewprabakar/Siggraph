@@ -414,6 +414,67 @@ def check_filter_chips(engine: str, browser, index_url: str) -> None:
     context.close()
 
 
+def check_theme_switch_preserves_scroll(engine: str, browser, index_url: str) -> None:
+    print(f"\n== {engine}: theme switch preserves scroll state ==")
+    context = browser.new_context(viewport={"width": 1280, "height": 800})
+    page, errors = fresh_page(context, index_url)
+
+    theme_state = page.evaluate("""
+        () => {
+          App.catalog.filter(c => c.day && c.s0 != null && c.e0 != null).slice(0, 12)
+            .forEach(c => App.togglePick(c));
+          const catalog = document.getElementById('catalog');
+          const grid = document.querySelector('.grid-scroll');
+          catalog.scrollTop = 260;
+          grid.scrollTop = 320;
+          const firstCard = document.querySelector('.cat-item');
+          const firstTile = document.querySelector('.ev');
+          const swatches = [...document.querySelectorAll('.cat-item .swatch[data-program-color]')];
+          const before = {
+            catalogScroll: catalog.scrollTop,
+            gridScroll: grid.scrollTop,
+            cardColors: swatches.map(el => getComputedStyle(el).backgroundColor),
+            tileColor: getComputedStyle(firstTile).backgroundColor,
+          };
+          const sel = document.getElementById('themeSelect');
+          sel.value = 'light';
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          const swatchesAfter = [...document.querySelectorAll('.cat-item .swatch[data-program-color]')];
+          return {
+            before,
+            after: {
+              catalogScroll: catalog.scrollTop,
+              gridScroll: grid.scrollTop,
+              cardSame: firstCard === document.querySelector('.cat-item'),
+              tileSame: firstTile === document.querySelector('.ev'),
+              cardColors: swatchesAfter.map(el => getComputedStyle(el).backgroundColor),
+              cardNodesSame: swatches.every((el, i) => el === swatchesAfter[i]),
+              tileColor: getComputedStyle(firstTile).backgroundColor,
+            },
+          };
+        }
+    """)
+    record(theme_state["after"]["catalogScroll"] == theme_state["before"]["catalogScroll"],
+           "theme switch keeps Browse scroll position",
+           f"before={theme_state['before']['catalogScroll']} after={theme_state['after']['catalogScroll']}")
+    record(theme_state["after"]["gridScroll"] == theme_state["before"]["gridScroll"],
+           "theme switch keeps My Day scroll position",
+           f"before={theme_state['before']['gridScroll']} after={theme_state['after']['gridScroll']}")
+    record(theme_state["after"]["cardSame"], "theme switch does not rebuild Browse cards")
+    record(theme_state["after"]["tileSame"], "theme switch does not rebuild My Day tiles")
+    record(theme_state["after"]["cardNodesSame"], "theme switch keeps Browse swatch nodes")
+    card_recolored = any(
+        after != before
+        for before, after in zip(theme_state["before"]["cardColors"], theme_state["after"]["cardColors"])
+    )
+    record(card_recolored,
+           "theme switch recolors Browse program swatches in place")
+    record(theme_state["after"]["tileColor"] != theme_state["before"]["tileColor"],
+           "theme switch recolors My Day tiles in place")
+    record(len(errors) == 0, "no console/page errors during theme switching", "; ".join(errors))
+    context.close()
+
+
 def check_clear_confirmation(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: clear confirmation dialog ==")
     context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
@@ -537,6 +598,7 @@ def main() -> int:
                     check_shared_schedule_link(engine, browser, index_url)
                     check_large_share_qr(engine, browser, index_url)
                     check_filter_chips(engine, browser, index_url)
+                    check_theme_switch_preserves_scroll(engine, browser, index_url)
                     check_clear_confirmation(engine, browser, index_url)
                     check_floorplan(engine, browser, index_url)
                 finally:

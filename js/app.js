@@ -48,13 +48,23 @@ const THEME_KEY='s2026-theme', THEMES=['siggraph','light','dark'];
 function curTheme(){return document.documentElement.dataset.theme||'siggraph';}
 let PROGRAM_COLORS=PALETTES[curTheme()]||PALETTES.siggraph;
 function colorFor(p){return PROGRAM_COLORS[p]||PALETTE_FALLBACK[curTheme()]||"#5f6e70";}
+function programColorAttr(p){return `data-program-color="${esc(p)}"`;}
+function updateProgramColors(){
+  document.querySelectorAll('[data-program-color]').forEach(el=>{
+    const p=el.dataset.programColor;
+    const color=colorFor(p);
+    if(el.classList.contains('pop-program'))el.style.color=color;
+    else el.style.background=color;
+  });
+}
 function applyTheme(name){
   if(!THEMES.includes(name))name='siggraph';
   document.documentElement.dataset.theme=name;
   PROGRAM_COLORS=PALETTES[name]||PALETTES.siggraph;
   try{localStorage.setItem(THEME_KEY,name);}catch(e){}
   const sel=document.getElementById('themeSelect');if(sel)sel.value=name;
-  if(typeof renderCatalog==='function'){renderCatalog();renderTimetable();}
+  updateProgramColors();
+  syncDesktopPanelHeights();
 }
 
 /* ---- seed: real S2026 sessions, fully tagged ---- */
@@ -308,7 +318,7 @@ function renderSessionCard(c){
   const wd=WEEKDAY_BY_ISO[c.day]||'';
   const el=document.createElement('div');
   el.className='cat-item'+(picked.has(c.id)?' picked':'');
-  el.innerHTML=`<span class="swatch" style="background:${colorFor(c.program)}"></span>
+  el.innerHTML=`<span class="swatch" ${programColorAttr(c.program)} style="background:${colorFor(c.program)}"></span>
     <div class="cat-body"><p class="cat-title">${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="View on the SIGGRAPH schedule site" onclick="event.stopPropagation()">${esc(c.t)} <svg class="ico ext-arrow"><use href="#i-external"></use></svg></a>`:esc(c.t)}</p>
     <div class="cat-meta"><span class="tag">${esc(c.program)}</span><span>${wd} · ${c.s0!=null&&c.e0!=null?fmtTimeRange(c.s0,c.e0):'—'}</span>${c.room?`<span class="room-link" title="Show on floor plan"><svg class="ico"><use href="#i-pin"></use></svg>${esc(c.room)}</span>`:''}</div>
     ${renderRegBubbles(c.reg)}</div>
@@ -393,6 +403,7 @@ function renderTimetable(){
         const short=h<40;
         el.className='ev'+(conf.has(e.id)?' conflict':'')+(e.pr===1?' p-high':'')+(e.pr===3?' p-low':'')+(short?' compact':'');
         el.dataset.id=e.id;
+        el.dataset.programColor=e.program;
         el.style.top=top+'px';el.style.height=h+'px';
         el.style.left=`calc(${col*wPct}% + ${col?gutter/2:0}px)`;
         el.style.width=`calc(${wPct}% - ${gutter}px)`;
@@ -447,7 +458,7 @@ setInterval(()=>{updateNowLine();updateLiveChip();},30000);
 function renderLegend(evs){
   const leg=document.getElementById('legend');
   const progs=[...new Set(evs.map(e=>e.program))];
-  leg.innerHTML=progs.length?progs.map(p=>`<span class="l"><span class="sw" style="background:${colorFor(p)}"></span>${esc(p)}</span>`).join(''):'';
+  leg.innerHTML=progs.length?progs.map(p=>`<span class="l"><span class="sw" ${programColorAttr(p)} style="background:${colorFor(p)}"></span>${esc(p)}</span>`).join(''):'';
 }
 function syncDayTabs(){
   document.querySelectorAll('.day-tab').forEach(tab=>{
@@ -475,7 +486,7 @@ function renderPriorityPop(e,anchor){
   pop.innerHTML=`<button class="remove pop-remove" type="button" title="Remove from My Day" aria-label="Remove from My Day"><svg class="ico"><use href="#i-trash"></use></svg></button>
     <h4>${title}</h4>
     <div class="pop-details">
-      <div class="pop-row pop-program" style="color:${colorFor(e.program)}"><span>${esc(e.program)}</span></div>
+      <div class="pop-row pop-program" ${programColorAttr(e.program)} style="color:${colorFor(e.program)}"><span>${esc(e.program)}</span></div>
       <div class="pop-row pop-date"><svg class="ico"><use href="#i-calendar"></use></svg><span>${esc(dayLabel)}</span></div>
       <div class="pop-row pop-time"><svg class="ico"><use href="#i-clock"></use></svg><span>${fmtTimeRange(e.s0,e.e0)}</span></div>
       <div class="pop-row pop-duration"><svg class="ico"><use href="#i-hourglass"></use></svg><span>${fmtDuration(e.s0,e.e0)}</span></div>
