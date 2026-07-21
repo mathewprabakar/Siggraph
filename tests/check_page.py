@@ -339,12 +339,15 @@ def check_shared_schedule_link(engine: str, browser, index_url: str) -> None:
           optIn.click();
           const url = App.shareUrl(true);
           const appUrl = App.shareUrl(false);
+          const token = new URLSearchParams(url.split('#')[1]).get('p');
+          const bytes = Uint8Array.from(atob(token.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((token.length + 3) % 4)), c => c.charCodeAt(0));
           return {
             url,
             appUrl,
             optedOut,
             defaultLabel,
             label: document.querySelector('#sharePop .share-url').textContent,
+            bytes: [...bytes],
             titles: cands.map(c => c.t),
           };
         }
@@ -352,7 +355,10 @@ def check_shared_schedule_link(engine: str, browser, index_url: str) -> None:
     record(shared["optedOut"], "Share QR defaults to app-only")
     record(shared["defaultLabel"] == "App link", "app share UI uses a friendly link label")
     record("#p=" in shared["url"], "Share QR link includes encoded picks")
-    record(len(shared["url"]) < len(shared["appUrl"]) + 40, "small shared schedules use a compact sparse link")
+    record(shared["bytes"][:3] == [83, 52, 4], "shared schedule uses compact stable-ID payloads")
+    record((shared["bytes"][3] | (shared["bytes"][4] << 8)) == 2 and len(shared["bytes"]) == 11,
+           "small shared schedule stores normal picks in 3 bytes each",
+           f"bytes={len(shared['bytes'])}")
     record(shared["label"].startswith("Schedule link"), "schedule share UI uses a friendly link label")
 
     shared_context = browser.new_context(viewport={"width": 390, "height": 844})
@@ -372,6 +378,54 @@ def check_shared_schedule_link(engine: str, browser, index_url: str) -> None:
            f"restored={restored['titles']}")
     record(restored["url"] == shared["appUrl"], "shared link is removed from the address bar after loading",
            f"url={restored['url']}")
+
+    repeated = page.evaluate("""
+        () => {
+          App.picked.clear();
+          const groups = new Map();
+          App.catalog.filter(c => c.sid).forEach(c => groups.set(c.sid, [...(groups.get(c.sid) || []), c]));
+          const cands = [...groups.values()].find(items => items.length > 1).slice(0, 2);
+          cands.forEach(c => App.togglePick(c));
+          const url = App.shareUrl(true);
+          const token = new URLSearchParams(url.split('#')[1]).get('p');
+          const bytes = Uint8Array.from(atob(token.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((token.length + 3) % 4)), c => c.charCodeAt(0));
+          return { url, ids: cands.map(c => c.id).sort(), bytes: [...bytes] };
+        }
+    """)
+    record(len(repeated["bytes"]) == 11, "repeated sid picks stay compact with day/start disambiguation",
+           f"bytes={len(repeated['bytes'])}")
+    repeated_context = browser.new_context(viewport={"width": 390, "height": 844})
+    repeated_page = repeated_context.new_page()
+    repeated_page.goto(repeated["url"])
+    repeated_page.wait_for_function("window.App && App.picked.size === 2", timeout=10000)
+    repeated_restored = repeated_page.evaluate("() => [...App.picked.values()].map(e => e.id).sort()")
+    record(repeated_restored == repeated["ids"], "shared link restores distinct repeated sid occurrences",
+           f"restored={repeated_restored}")
+    repeated_context.close()
+
+    fallback = page.evaluate("""
+        () => {
+          App.picked.clear();
+          const cand = App.catalog.find(c => !c.sid && c.day && c.s0 != null && c.e0 != null);
+          App.togglePick(cand);
+          const url = App.shareUrl(true);
+          const token = new URLSearchParams(url.split('#')[1]).get('p');
+          const bytes = Uint8Array.from(atob(token.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((token.length + 3) % 4)), c => c.charCodeAt(0));
+          const packed = bytes[5] | (bytes[6] << 8) | (bytes[7] << 16);
+          return { url, id: cand.id, title: cand.t, sidNum: packed & 1023, fallbackLen: bytes[8], bytes: bytes.length };
+        }
+    """)
+    record(fallback["sidNum"] == 1023 and fallback["fallbackLen"] > 0,
+           "no-sid shared pick uses compact escape row", f"len={fallback['fallbackLen']}")
+    fallback_context = browser.new_context(viewport={"width": 390, "height": 844})
+    fallback_page = fallback_context.new_page()
+    fallback_page.goto(fallback["url"])
+    fallback_page.wait_for_function("window.App && App.picked.size === 1", timeout=10000)
+    fallback_restored = fallback_page.evaluate("() => [...App.picked.values()][0].id")
+    record(fallback_restored == fallback["id"], "shared link restores no-sid fallback picks",
+           f"restored={fallback_restored}")
+    fallback_context.close()
+
     record(len(errors) == 0, "no console/page errors while creating share link", "; ".join(errors))
     record(len(shared_errors) == 0, "no console/page errors while opening share link", "; ".join(shared_errors))
     shared_context.close()
@@ -390,21 +444,23 @@ def check_large_share_qr(engine: str, browser, index_url: str) -> None:
           document.getElementById('btnShare').click();
           document.getElementById('shareIncludeSchedule').click();
           const canvas = document.getElementById('qrCanvas');
-          const rect = canvas.getBoundingClientRect();
+          const fallback = document.querySelector('.qr-fallback');
+          const rect = (canvas || fallback).getBoundingClientRect();
           return {
             label: document.querySelector('#sharePop .share-url').textContent,
+            fallback: fallback?.textContent.trim() || '',
             width: rect.width,
             height: rect.height,
-            backingWidth: canvas.width,
+            backingWidth: canvas?.width || 0,
             urlLength: App.shareUrl(true).length,
           };
         }
     """)
     record(qr["label"].startswith("Schedule link"), "large share UI summarizes the schedule link")
-    record(qr["width"] <= 216 and qr["height"] <= 216, "large schedule QR keeps a stable display size",
+    record(qr["width"] <= 216 and qr["height"] <= 216, "large schedule share preview keeps a stable display size",
            f"{qr['width']}x{qr['height']}")
-    record(qr["backingWidth"] >= qr["width"], "large schedule QR keeps enough backing pixels",
-           f"backing={qr['backingWidth']} display={qr['width']}")
+    record(not qr["fallback"] and qr["backingWidth"] >= qr["width"], "large schedule QR renders with compact stable payload",
+           f"fallback={qr['fallback']} backing={qr['backingWidth']} display={qr['width']}")
     record(len(errors) == 0, "no console/page errors while rendering large share QR", "; ".join(errors))
     context.close()
 

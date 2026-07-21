@@ -129,19 +129,34 @@ function titleWithExternalIcon(title,iconClass=''){
   return `${lead}<span class="title-link-tail">${esc(last)}&nbsp;<svg class="${cls}"><use href="#i-external"></use></svg></span>`;
 }
 function uid(ev){return (ev.day+'|'+ev.s+'|'+ev.t).toLowerCase().replace(/\s+/g,' ').slice(0,140);}
+function urlParam(url,key){
+  if(!url)return '';
+  try{return new URL(url,location.href).searchParams.get(key)||'';}
+  catch(e){const m=String(url).match(new RegExp(`[?&]${key}=([^&#]+)`));return m?decodeURIComponent(m[1].replace(/\+/g,' ')):'';}
+}
+function occurrenceId(ev){return ev.sid?(ev.sid+'|'+ev.day+'|'+ev.s):uid(ev);}
+function assignCatalogIds(list){
+  const sidCounts=new Map();
+  list.forEach(e=>{if(e.sid)sidCounts.set(e.sid,(sidCounts.get(e.sid)||0)+1);});
+  list.forEach(e=>{e.id=e.sid&&(sidCounts.get(e.sid)===1)?e.sid:occurrenceId(e);});
+  return list;
+}
+function normalizeCatalog(list){return assignCatalogIds(list.map(norm));}
 function norm(ev){
   const s0=parseTime(ev.s), e0=ev.e!=null?parseTime(ev.e):null;
   const programs=(ev.programs&&ev.programs.length)?ev.programs:[ev.program||ev.type||'Session'];
+  const sid=ev.sid||urlParam(ev.url,'sess');
+  const pid=ev.pid||urlParam(ev.url,'id');
   const o={t:ev.t,program:programs[0],programs,day:ev.day,s:ev.s,e:ev.e||(s0!=null?fmtTime(s0+30):''),
-    room:ev.room||'',url:ev.url||'',ia:ev.ia||[],kw:ev.kw||[],reg:ev.reg||[],s0,e0:(e0!=null?e0:(s0!=null?s0+30:null)),pr:ev.pr||2};
-  o.id=ev.id||uid(o);
+    room:ev.room||'',url:ev.url||'',sid,pid,ia:ev.ia||[],kw:ev.kw||[],reg:ev.reg||[],s0,e0:(e0!=null?e0:(s0!=null?s0+30:null)),pr:ev.pr||2};
+  o.id=ev.id||occurrenceId(o);
   o.hay=(o.t+' '+o.programs.join(' ')+' '+o.room+' '+o.ia.join(' ')+' '+o.kw.join(' ')).toLowerCase();
   return o;
 }
 
 /* ---- state ---- */
-const STORE_KEY='siggraph2026_timetable_v2';
-let catalog=SEED.map(norm);      // replaced by the fetched catalog at startup; SEED is the offline fallback
+const STORE_KEY='siggraph2026_timetable_v3';
+let catalog=normalizeCatalog(SEED);      // replaced by the fetched catalog at startup; SEED is the offline fallback
 let picked=new Map();            // id -> normalized event (with pr)
 let catalogGenerated='';
 let activeDay=DAYS[0].iso;
@@ -165,7 +180,7 @@ async function loadCatalog(){
     const arr=Array.isArray(data)?data:data.catalog;
     catalogGenerated=Array.isArray(data)?'':(data.generated||'');
     if(Array.isArray(arr)&&arr.length){
-      catalog=arr.map(norm);
+      catalog=normalizeCatalog(arr);
       T_ROOM=deriveRooms(catalog);
     }
   }catch(e){
@@ -781,44 +796,40 @@ function b64UrlDecodeBytes(s){
   const bin=atob(padded);
   return Uint8Array.from(bin,c=>c.charCodeAt(0));
 }
-function denseShareBytes(){
-  const count=catalog.length;
-  const bitBytes=Math.ceil(count/8);
-  const priBytes=Math.ceil(count/4);
-  const bytes=new Uint8Array(5+bitBytes+priBytes);
-  bytes[0]=83;bytes[1]=51;bytes[2]=2;bytes[3]=bitBytes&255;bytes[4]=bitBytes>>8;
-  const byId=new Map(catalog.map((c,i)=>[c.id,i]));
-  picked.forEach(e=>{
-    const idx=byId.get(e.id);
-    if(idx==null)return;
-    bytes[5+(idx>>3)]|=1<<(idx&7);
-    const po=5+bitBytes+(idx>>2);
-    bytes[po]|=((e.pr||2)&3)<<((idx&3)*2);
-  });
-  return bytes;
+const SHARE_MAGIC_0=83, SHARE_MAGIC_1=52, SHARE_VERSION=4, SHARE_ESCAPE_SID=1023, SHARE_BASE_DAY='2026-07-19';
+const SHARE_BASE_DAY_MS=Date.parse(SHARE_BASE_DAY+'T00:00:00Z');
+function shareSidNum(sid){const m=String(sid||'').match(/^sess(\d+)$/);return m?parseInt(m[1],10):null;}
+function shareDayOffset(day){return Math.round((Date.parse(day+'T00:00:00Z')-SHARE_BASE_DAY_MS)/86400000);}
+function packShareRow(sidNum,day,start,pr){
+  const dayOffset=shareDayOffset(day), slot=Math.round((parseTime(start)||0)/15);
+  if(sidNum<0||sidNum>SHARE_ESCAPE_SID||dayOffset<0||dayOffset>7||slot<0||slot>127)throw new Error('Share row out of range');
+  const v=sidNum|(dayOffset<<10)|(slot<<13)|((pr&3)<<20);
+  return [v&255,(v>>8)&255,(v>>16)&255];
 }
-function sparseShareBytes(){
-  const byId=new Map(catalog.map((c,i)=>[c.id,i]));
-  const rows=[];
-  [...picked.values()]
-    .sort((a,b)=>a.day.localeCompare(b.day)||(a.s0-b.s0)||a.t.localeCompare(b.t))
-    .forEach(e=>{
-      const idx=byId.get(e.id);
-      if(idx!=null)rows.push([idx,e.pr||2]);
-    });
-  const bytes=new Uint8Array(5+rows.length*2);
-  bytes[0]=83;bytes[1]=51;bytes[2]=1;bytes[3]=rows.length&255;bytes[4]=rows.length>>8;
-  rows.forEach(([idx,pr],i)=>{
-    const off=5+i*2;
-    bytes[off]=idx&255;
-    bytes[off+1]=((idx>>8)&1)|((pr&3)<<1);
+function unpackShareRow(bytes,off){
+  const v=bytes[off]|(bytes[off+1]<<8)|(bytes[off+2]<<16);
+  const sidNum=v&1023, dayOffset=(v>>10)&7, slot=(v>>13)&127, pr=(v>>20)&3;
+  return {sidNum,day:new Date(SHARE_BASE_DAY_MS+dayOffset*86400000).toISOString().slice(0,10),s:_fmtShareSlot(slot),pr:pr||2};
+}
+function _fmtShareSlot(slot){return fmtTime(slot*15).replace(' ','').toLowerCase();}
+function packedShareBytes(){
+  const rows=[...picked.values()].sort((a,b)=>a.day.localeCompare(b.day)||(a.s0-b.s0)||a.t.localeCompare(b.t));
+  const out=[SHARE_MAGIC_0,SHARE_MAGIC_1,SHARE_VERSION,rows.length&255,rows.length>>8];
+  const enc=new TextEncoder();
+  rows.forEach(e=>{
+    const sidNum=shareSidNum(e.sid);
+    if(sidNum!=null&&sidNum<SHARE_ESCAPE_SID){
+      out.push(...packShareRow(sidNum,e.day,e.s,e.pr||2));
+    }else{
+      const idBytes=enc.encode(e.id);
+      if(idBytes.length>255)throw new Error('Fallback share id too long');
+      out.push(...packShareRow(SHARE_ESCAPE_SID,e.day,e.s,e.pr||2),idBytes.length,...idBytes);
+    }
   });
-  return bytes;
+  return Uint8Array.from(out);
 }
 function packedShareToken(){
-  const sparse=sparseShareBytes();
-  const dense=denseShareBytes();
-  return b64UrlEncodeBytes(sparse.length<=dense.length?sparse:dense);
+  return b64UrlEncodeBytes(packedShareBytes());
 }
 function shareUrl(includeSchedule=false){
   const base=location.origin+location.pathname+location.search;
@@ -836,42 +847,60 @@ function applySharedSchedule(){
   const raw=params.get(SHARE_PARAM);
   if(!raw)return false;
   try{
-    const bytes=b64UrlDecodeBytes(raw);
-    if(bytes[0]===83&&bytes[1]===51&&bytes[2]===1){
-      const count=bytes[3]|(bytes[4]<<8);
-      picked.clear();
-      for(let i=0;i<count;i++){
-        const off=5+i*2;
-        const idx=bytes[off]|((bytes[off+1]&1)<<8);
-        const pr=(bytes[off+1]>>1)&3;
-        const c=catalog[idx];
-        if(c){const n=norm({...c,pr:pr||2});picked.set(n.id,n);}
-      }
-    }else if(bytes[0]===83&&bytes[1]===51&&bytes[2]===2){
-      const bitBytes=bytes[3]|(bytes[4]<<8);
-      picked.clear();
-      catalog.forEach((c,idx)=>{
-        if(bytes[5+(idx>>3)]&(1<<(idx&7))){
-          const prByte=bytes[5+bitBytes+(idx>>2)]||0;
-          const pr=(prByte>>((idx&3)*2))&3;
-          const n=norm({...c,pr:pr||2});
-          picked.set(n.id,n);
-        }
-      });
-    }else{
-      return false;
-    }
-      const first=[...picked.values()].find(e=>e.day);
-      if(first)activeDay=first.day;
-      saveState();
-      clearSharedScheduleUrl();
-      toast('Loaded shared schedule: '+picked.size+' session'+(picked.size===1?'':'s'));
-      return true;
+    const rows=unpackSharedRows(b64UrlDecodeBytes(raw));
+    picked.clear();
+    let missing=0,changed=0;
+    rows.forEach(row=>{
+      const match=matchSharedPick(row);
+      if(!match){missing++;return;}
+      if(row.day&&row.s&&(match.day!==row.day||match.s!==row.s))changed++;
+      const n=norm({...match,pr:row.pr||2});
+      picked.set(n.id,n);
+    });
+    const first=[...picked.values()].find(e=>e.day);
+    if(first)activeDay=first.day;
+    saveState();
+    clearSharedScheduleUrl();
+    let msg='Loaded shared schedule: '+picked.size+' session'+(picked.size===1?'':'s');
+    if(missing||changed)msg+=' ('+(missing?missing+' unavailable':'')+(missing&&changed?', ':'')+(changed?changed+' moved':'')+')';
+    toast(msg);
+    return true;
   }catch(e){
     console.warn('Could not load shared schedule from URL.',e);
     toast('Could not load shared schedule');
     return false;
   }
+}
+function unpackSharedRows(bytes){
+  if(bytes[0]!==SHARE_MAGIC_0||bytes[1]!==SHARE_MAGIC_1||bytes[2]!==SHARE_VERSION)throw new Error('Unsupported share token');
+  const count=bytes[3]|(bytes[4]<<8), rows=[];
+  const dec=new TextDecoder();
+  let off=5;
+  for(let i=0;i<count;i++){
+    const row=unpackShareRow(bytes,off);off+=3;
+    if(row.sidNum===SHARE_ESCAPE_SID){
+      const len=bytes[off++];
+      row.id=dec.decode(bytes.slice(off,off+len));off+=len;
+    }else{
+      row.sid='sess'+row.sidNum;
+    }
+    delete row.sidNum;
+    rows.push(row);
+  }
+  return rows;
+}
+function matchSharedPick(row){
+  if(row.sid){
+    const matches=catalog.filter(c=>c.sid===row.sid);
+    if(matches.length===1)return matches[0];
+    if(matches.length>1){
+      return matches.find(c=>c.day===row.day&&c.s===row.s)
+        || matches.find(c=>c.day===row.day)
+        || matches[0];
+    }
+  }
+  if(row.id)return catalog.find(c=>c.id===row.id)||null;
+  return null;
 }
 
 const sharePop=document.getElementById('sharePop');
@@ -885,7 +914,7 @@ function openSharePop(anchor){
       <input id="shareIncludeSchedule" type="checkbox">
       <span>Include my schedule<small>Adds your selected sessions to the shared link.</small></span>
     </label>`:''}
-    <canvas id="qrCanvas"></canvas>
+    <div class="qr-box" id="qrBox"></div>
     <div class="share-url mono"></div>
     <div class="share-summary mono"></div>
     <div class="pop-actions">
@@ -895,15 +924,18 @@ function openSharePop(anchor){
   const urlEl=sharePop.querySelector('.share-url');
   const summaryEl=sharePop.querySelector('.share-summary');
   const copyEl=sharePop.querySelector('.share-copy');
-  const canvas=document.getElementById('qrCanvas');
+  const qrBox=document.getElementById('qrBox');
   function currentShareUrl(){return shareUrl(includeSchedule);}
   function renderShareQr(){
     const url=currentShareUrl();
     copyEl.textContent=includeSchedule?'Scan the QR code or copy a link with your selected sessions.':'Scan the QR code or copy the app link.';
     urlEl.textContent=includeSchedule?('Schedule link - '+picked.size+' session'+(picked.size===1?'':'s')):'App link';
     summaryEl.textContent='';
-    try{drawQR(canvas,url);}
-    catch(e){canvas.replaceWith('QR code unavailable for this link');}
+    qrBox.innerHTML='<canvas id="qrCanvas"></canvas>';
+    try{drawQR(qrBox.querySelector('canvas'),url);}
+    catch(e){
+      qrBox.innerHTML='<div class="qr-fallback">QR unavailable for this many selected sessions. Copy or share the link instead.</div>';
+    }
   }
   const includeEl=document.getElementById('shareIncludeSchedule');
   if(includeEl)includeEl.onchange=()=>{includeSchedule=includeEl.checked;renderShareQr();};
