@@ -549,8 +549,8 @@ function showLocation(roomStr,anchor){
 
 /* ---- floor plan: LA Convention Center ----
    Uses the official SIGGRAPH 2026 venue map SVGs (s2026.conference-schedule.org/map/).
-   Each level (~250 KB) is fetched from assets/maps/lacc-level{1,2}.svg only when the map is first
-   opened, so it never loads for the many visitors who never open it. Those SVGs ship as
+   Each level (~250 KB) is fetched lazily and warmed after startup so the first
+   floor-plan open is quick without blocking the initial app render. Those SVGs ship as
    outlined vector art with no machine-readable room labels, so the highlight rects below
    were positioned by probing the map's own paths in a real browser (getBBox() on the path
    under each room, cross-checked against the rendered labels) rather than by tracing
@@ -609,13 +609,27 @@ function fpBuildOverlay(levelN){
 }
 /* Fetch + inject a level's SVG the first time it's needed, then draw its overlay. */
 const fpBuilt={1:false,2:false};
+const fpText={};
+const fpWarm={};
+async function fetchFpLevelText(n){
+  if(fpText[n])return fpText[n];
+  if(!fpWarm[n]){
+    fpWarm[n]=fetch('assets/maps/lacc-level'+n+'.svg',{cache:'no-cache'})
+      .then(res=>{if(!res.ok)throw new Error('HTTP '+res.status);return res.text();})
+      .then(text=>(fpText[n]=text));
+  }
+  return fpWarm[n];
+}
+function warmFloorPlans(){
+  const warm=()=>{fetchFpLevelText(1).catch(()=>{});fetchFpLevelText(2).catch(()=>{});};
+  if('requestIdleCallback' in window)requestIdleCallback(warm,{timeout:3500});
+  else setTimeout(warm,1200);
+}
 async function ensureFpLevel(n){
   if(fpBuilt[n])return true;
   const wrap=document.getElementById('fpLevel'+n+'Wrap');
   try{
-    const res=await fetch('assets/maps/lacc-level'+n+'.svg',{cache:'force-cache'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    wrap.innerHTML=await res.text();
+    wrap.innerHTML=await fetchFpLevelText(n);
     fpBuildOverlay(n);
     fpBuilt[n]=true;
     return true;
@@ -900,6 +914,7 @@ function clearPickedSchedule(){
 /* ---- wire up ---- */
 document.addEventListener('DOMContentLoaded',async ()=>{
   await loadCatalog();
+  warmFloorPlans();
   buildDayControls();
   loadState();
   applySharedSchedule();

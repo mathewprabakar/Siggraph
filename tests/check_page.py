@@ -399,16 +399,23 @@ def check_clear_confirmation(engine: str, browser, index_url: str) -> None:
 
 
 def check_floorplan(engine: str, browser, index_url: str) -> None:
-    print(f"\n== {engine}: floor plan (lazy-loaded maps) ==")
+    print(f"\n== {engine}: floor plan (warmed maps) ==")
     context = browser.new_context(viewport={"width": 1280, "height": 800})
     page, errors = fresh_page(context, index_url)
 
-    svg_reqs: list[str] = []
-    page.on("request", lambda r: svg_reqs.append(r.url) if r.url.endswith(".svg") else None)
-
-    # The two ~250KB maps must NOT load until the user opens the floor plan.
-    record(not any("lacc-level" in u for u in svg_reqs),
-           "floor-plan SVGs are not fetched on initial load", f"requested: {svg_reqs}")
+    page.wait_for_function(
+        """() => [1, 2].every(n =>
+          performance.getEntriesByName(new URL(`assets/maps/lacc-level${n}.svg`, location.href).href).length > 0
+        )""",
+        timeout=10000,
+    )
+    warmed = page.evaluate("""
+        () => performance.getEntriesByType('resource').map(e => e.name)
+    """)
+    record(any("lacc-level1.svg" in u for u in warmed),
+           "Level 1 SVG is warmed before first floor-plan open", f"resources: {warmed}")
+    record(any("lacc-level2.svg" in u for u in warmed),
+           "Level 2 SVG is warmed before first floor-plan open", f"resources: {warmed}")
 
     # Open a Level-1 room; its SVG should load and the room highlight should land.
     l1 = page.evaluate("""
@@ -423,7 +430,7 @@ def check_floorplan(engine: str, browser, index_url: str) -> None:
     record(l1["open"], "floor-plan modal opens")
     record(l1["svgInjected"], "Level 1 SVG is injected on open")
     record(l1["highlighted"] == "hallk", "Hall K highlights on Level 1", f"hl={l1['highlighted']}")
-    record(any("lacc-level1.svg" in u for u in svg_reqs), "Level 1 SVG fetched on open")
+    record(any("lacc-level1.svg" in u for u in warmed), "Level 1 SVG resource is available from warmup/open")
 
     # Open a Level-2 room; Level 2's SVG should load lazily too.
     l2 = page.evaluate("""
@@ -436,7 +443,10 @@ def check_floorplan(engine: str, browser, index_url: str) -> None:
     """)
     record(l2["svgInjected"], "Level 2 SVG is injected on open")
     record(l2["highlighted"] == "r411", "411 Theatre highlights on Level 2", f"hl={l2['highlighted']}")
-    record(any("lacc-level2.svg" in u for u in svg_reqs), "Level 2 SVG fetched on open")
+    warmed = page.evaluate("""
+        () => performance.getEntriesByType('resource').map(e => e.name)
+    """)
+    record(any("lacc-level2.svg" in u for u in warmed), "Level 2 SVG resource is available from warmup/open")
 
     dark_levels = page.evaluate("""
         () => {
