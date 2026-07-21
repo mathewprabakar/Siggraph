@@ -90,7 +90,14 @@ function parseTime(str){
   if(ap==='pm'&&h!==12)h+=12; if(ap==='am'&&h===12)h=0; if(!ap&&h<8)h+=12;
   return h*60+min;
 }
-function fmtTime(mins){let h=Math.floor(mins/60),m=mins%60;const ap=h>=12?'pm':'am';let hh=h%12;if(hh===0)hh=12;return hh+(m?(':'+String(m).padStart(2,'0')):'')+ap;}
+function fmtTime(mins){let h=Math.floor(mins/60),m=mins%60;const ap=h>=12?'PM':'AM';let hh=h%12;if(hh===0)hh=12;return hh+':'+String(m).padStart(2,'0')+' '+ap;}
+function fmtTimeRange(start,end){return fmtTime(start)+' - '+fmtTime(end);}
+function fmtDuration(start,end){
+  const mins=end-start;
+  if(mins<60)return mins+' min';
+  const h=Math.floor(mins/60),m=mins%60;
+  return h+' hr'+(h===1?'':'s')+(m?' '+m+' min':'');
+}
 function uid(ev){return (ev.day+'|'+ev.s+'|'+ev.t).toLowerCase().replace(/\s+/g,' ').slice(0,140);}
 function norm(ev){
   const s0=parseTime(ev.s), e0=ev.e!=null?parseTime(ev.e):null;
@@ -293,7 +300,7 @@ function renderSessionCard(c){
   el.className='cat-item'+(picked.has(c.id)?' picked':'');
   el.innerHTML=`<span class="swatch" style="background:${colorFor(c.program)}"></span>
     <div class="cat-body"><p class="cat-title">${c.url?`<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" title="View on the SIGGRAPH schedule site" onclick="event.stopPropagation()">${esc(c.t)} <svg class="ico ext-arrow"><use href="#i-external"></use></svg></a>`:esc(c.t)}</p>
-    <div class="cat-meta"><span class="tag">${esc(c.program)}</span><span>${wd} · ${c.s0!=null?fmtTime(c.s0):'—'}–${c.e0!=null?fmtTime(c.e0):''}</span>${c.room?`<span class="room-link" title="Show on floor plan"><svg class="ico"><use href="#i-pin"></use></svg>${esc(c.room)}</span>`:''}</div></div>
+    <div class="cat-meta"><span class="tag">${esc(c.program)}</span><span>${wd} · ${c.s0!=null&&c.e0!=null?fmtTimeRange(c.s0,c.e0):'—'}</span>${c.room?`<span class="room-link" title="Show on floor plan"><svg class="ico"><use href="#i-pin"></use></svg>${esc(c.room)}</span>`:''}</div></div>
     <button class="add-btn" title="${picked.has(c.id)?'Remove':'Add to my day'}">${picked.has(c.id)?'✓':'+'}</button>`;
   el.querySelector('.add-btn').onclick=()=>togglePick(c);
   const roomLink=el.querySelector('.room-link');
@@ -381,7 +388,7 @@ function renderTimetable(){
         el.style.background=colorFor(e.program);
         el.innerHTML=`<span class="et">${esc(e.t)}</span>
           ${short?'':`<span class="em">${esc(e.room||'')}</span>`}
-          <span class="em">${fmtTime(e.s0)}–${fmtTime(e.e0)}${short&&e.room?(' · '+esc(e.room)):''}</span>`;
+          <span class="em">${fmtTimeRange(e.s0,e.e0)}${short&&e.room?(' · '+esc(e.room)):''}</span>`;
         el.onclick=(ev)=>{ev.stopPropagation();openPop(e,el);};
         lane.appendChild(el);
       });
@@ -449,20 +456,25 @@ function openPop(e,anchor){
   renderPriorityPop(e,anchor);
 }
 function renderPriorityPop(e,anchor){
-  pop.innerHTML=`<h4>${esc(e.t)}</h4>
-    <div class="pm">${esc(e.program)} · ${fmtTime(e.s0)}–${fmtTime(e.e0)}${e.room?(' · '+esc(e.room)):''}</div>
-    ${(e.url||e.room)?`<div class="pop-actions">
-      ${e.url?`<a class="pop-link" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer"><svg class="ico"><use href="#i-external"></use></svg>View on schedule site</a>`:''}
-      ${e.room?`<button class="pop-link" id="popFloorBtn" type="button"><svg class="ico"><use href="#i-pin"></use></svg>Show on floor plan</button>`:''}
-    </div>`:''}
-    <div class="plabel">Priority when it clashes</div>
-    <div class="pri-btns">
-      <button data-pr="1" aria-pressed="${e.pr===1}">High</button>
-      <button data-pr="2" aria-pressed="${e.pr===2}">Medium</button>
-      <button data-pr="3" aria-pressed="${e.pr===3}">Low</button>
+  const title=e.url
+    ? `<a class="pop-title-link" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">${esc(e.t)} <svg class="ico"><use href="#i-external"></use></svg></a>`
+    : esc(e.t);
+  const dayLabel=labelForDay(e.day);
+  pop.innerHTML=`<button class="remove pop-remove" type="button" title="Remove from My Day" aria-label="Remove from My Day"><svg class="ico"><use href="#i-trash"></use></svg></button>
+    <h4>${title}</h4>
+    <div class="pop-details">
+      <div class="pop-row pop-program" style="color:${colorFor(e.program)}"><span>${esc(e.program)}</span></div>
+      <div class="pop-row pop-date"><svg class="ico"><use href="#i-calendar"></use></svg><span>${esc(dayLabel)}</span></div>
+      <div class="pop-row pop-time"><svg class="ico"><use href="#i-clock"></use></svg><span>${fmtTimeRange(e.s0,e.e0)}</span></div>
+      <div class="pop-row pop-duration"><svg class="ico"><use href="#i-hourglass"></use></svg><span>${fmtDuration(e.s0,e.e0)}</span></div>
+      ${e.room?`<button class="pop-row pop-row-action" id="popFloorBtn" type="button" title="Show location on floor plan"><svg class="ico"><use href="#i-pin"></use></svg><span>${esc(e.room)}</span></button>`:''}
     </div>
-    <div class="hint">Higher priority sits to the left when sessions overlap. Low priority also dims slightly.</div>
-    <button class="remove">Remove from my day</button>`;
+    <div class="plabel">Priority</div>
+    <div class="pri-btns">
+      <button class="pri-high" data-pr="1" aria-pressed="${e.pr===1}"><span class="pri-dot"></span>High</button>
+      <button class="pri-normal" data-pr="2" aria-pressed="${e.pr===2}"><span class="pri-dot"></span>Normal</button>
+      <button class="pri-low" data-pr="3" aria-pressed="${e.pr===3}"><span class="pri-dot"></span>Low</button>
+    </div>`;
   pop.querySelectorAll('.pri-btns button').forEach(b=>b.onclick=()=>{setPriority(e.id,parseInt(b.dataset.pr,10));pop.querySelectorAll('.pri-btns button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));});
   pop.querySelector('.remove').onclick=()=>removeWithUndo(e);
   const popFloorBtn=pop.querySelector('#popFloorBtn');
@@ -486,7 +498,7 @@ function positionPopover(el,anchor,width,fallbackHeight,align){
   let top=window.scrollY+r.bottom+6; if(top+ph>window.scrollY+window.innerHeight-10)top=window.scrollY+r.top-ph-6;
   el.style.left=Math.max(10,left)+'px';el.style.top=Math.max(10,top)+'px';
 }
-function positionPop(anchor){positionPopover(pop,anchor,250,210,'left');}
+function positionPop(anchor){positionPopover(pop,anchor,268,200,'left');}
 function removeWithUndo(e){
   picked.delete(e.id);saveState();renderCatalog();renderTimetable();syncDayTabs();
   closePop();

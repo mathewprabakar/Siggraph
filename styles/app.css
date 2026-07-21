@@ -47,6 +47,7 @@
   :root[data-theme="dark"] .pri-btns button,
   :root[data-theme="dark"] .pop,
   :root[data-theme="dark"] .pop .remove,
+  :root[data-theme="dark"] .pop-row-action,
   :root[data-theme="dark"] .add-btn,
   :root[data-theme="dark"] .switch button,
   :root[data-theme="dark"] .search,
@@ -55,6 +56,8 @@
   :root[data-theme="dark"] .cat-item.picked .add-btn{border-color:var(--teal)}
   :root[data-theme="dark"] .lane .halfline{border-color:#283238}
   :root[data-theme="dark"] .conflict-strip{border-color:#5a3a42}
+  :root[data-theme="dark"] .pop .remove{background:transparent}
+  :root[data-theme="dark"] .pop .remove:hover{background:var(--wine-bg)}
   :root[data-theme="dark"] .toast{background:#0a1114;color:#e7eef0}
   /* the floor-plan map art is drawn for a light backdrop, so keep the modal light in every theme */
   :root[data-theme="dark"] .fp-modal,
@@ -209,17 +212,33 @@
   .legend .sw{width:11px;height:11px;border-radius:3px}
 
   /* priority popover */
-  .pop{position:absolute;z-index:70;background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 8px 30px rgba(42,66,73,.25);padding:12px;width:250px;display:none}
+  .pop{position:absolute;z-index:70;background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 8px 30px rgba(42,66,73,.25);padding:11px;width:268px;display:none}
   .pop.show{display:block}
-  .pop h4{margin:0 0 2px;font-size:13.5px;line-height:1.25}
-  .pop .pm{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-bottom:10px}
-  .pop .plabel{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
-  .pri-btns{display:flex;gap:6px}
-  .pri-btns button{flex:1;border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:7px 4px;font-size:12px;font-weight:700;color:var(--ink-soft)}
-  .pri-btns button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:#fff}
-  .pop .remove{margin-top:10px;width:100%;border:1px solid var(--line-strong);background:#fff;border-radius:8px;padding:8px;font-size:12.5px;font-weight:600;color:var(--wine)}
+  .pop h4{margin:0 28px 7px 0;font-size:13.5px;line-height:1.25}
+  .pop-title-link{color:var(--ink);text-decoration:none}
+  .pop-title-link:hover{color:var(--teal-ink);text-decoration:underline;text-underline-offset:2px}
+  .pop-title-link .ico{width:12px;height:12px;margin-left:3px;vertical-align:-1px;color:var(--teal-ink)}
+  .pop-details{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+  .pop-row{min-height:19px;display:grid;grid-template-columns:15px minmax(0,1fr);align-items:center;column-gap:6px;color:var(--ink);font-size:12px;font-weight:600;line-height:1.25}
+  .pop-row .ico{width:13px;height:13px;justify-self:center;color:var(--teal-ink)}
+  .pop-program{display:block;min-height:0;font-weight:700}
+  .pop-date{color:var(--ink-soft)}
+  .pop-time{color:var(--ink)}
+  .pop-row-action{width:auto;border:0;background:transparent;border-radius:6px;padding:1px 3px;margin-left:-3px;text-align:left;font-family:inherit;cursor:pointer;color:var(--ink)}
+  .pop-row-action:hover{background:transparent;color:var(--teal-ink);text-decoration:underline;text-underline-offset:2px}
+  .pop .plabel{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:5px}
+  .pri-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .pri-btns button{min-width:0;border:0;border-right:1px solid var(--line);background:#fff;padding:7px 5px;font-size:11.5px;font-weight:800;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit}
+  .pri-btns button:last-child{border-right:0}
+  .pri-btns button:hover{background:var(--hover);color:var(--ink)}
+  .pri-btns button[aria-pressed="true"]{color:#fff}
+  .pri-btns .pri-dot{width:7px;height:7px;border-radius:999px;background:currentColor;opacity:.72}
+  .pri-btns .pri-high[aria-pressed="true"]{background:var(--wine)}
+  .pri-btns .pri-normal[aria-pressed="true"]{background:var(--teal)}
+  .pri-btns .pri-low[aria-pressed="true"]{background:var(--ink-soft)}
+  .pop .remove{position:absolute;top:8px;right:8px;width:27px;height:27px;border:1px solid transparent;background:transparent;border-radius:8px;padding:0;display:flex;align-items:center;justify-content:center;color:var(--wine)}
+  .pop .remove .ico{width:15px;height:15px}
   .pop .remove:hover{background:var(--wine-bg);border-color:var(--wine)}
-  .pop .hint{font-size:11px;color:var(--ink-soft);margin-top:8px;line-height:1.35}
   .pop-actions{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
   .pop-link{display:inline-flex;align-items:center;gap:5px;border:none;background:none;padding:0;font-size:11.5px;font-weight:600;color:var(--teal-ink);text-decoration:none;cursor:pointer;font-family:inherit}
   .pop-link:hover{text-decoration:underline}

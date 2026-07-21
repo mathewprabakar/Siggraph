@@ -144,9 +144,66 @@ def check_session_flow(engine: str, browser, index_url: str) -> None:
            picked["saveNote"])
 
     opened = page.evaluate("""
-        () => { document.querySelector('.ev').click(); return App.pop.classList.contains('show'); }
+        () => {
+          const picked = [...App.picked.values()][0];
+          const tile = [...document.querySelectorAll('.ev')].find(el => el.dataset.id === picked.id);
+          tile.click();
+          return App.pop.classList.contains('show');
+        }
     """)
     record(opened, "tapping a tile opens the priority popup")
+
+    popup = page.evaluate("""
+        () => {
+          const pop = App.pop;
+          const picked = [...App.picked.values()][0];
+          const rowText = sel => pop.querySelector(sel)?.textContent.trim() || '';
+          const iconHref = sel => pop.querySelector(sel + ' use')?.getAttribute('href') || '';
+          return {
+            titleLink: !!pop.querySelector('.pop-title-link[href]'),
+            program: rowText('.pop-program'),
+            programColor: getComputedStyle(pop.querySelector('.pop-program')).color,
+            dateIcon: iconHref('.pop-date'),
+            date: rowText('.pop-date'),
+            timeIcon: iconHref('.pop-time'),
+            time: rowText('.pop-time'),
+            durationIcon: iconHref('.pop-duration'),
+            duration: rowText('.pop-duration'),
+            locationIcon: iconHref('.pop-row-action'),
+            location: rowText('.pop-row-action'),
+            removeLabel: pop.querySelector('.remove')?.getAttribute('aria-label'),
+            priorityLabels: [...pop.querySelectorAll('.pri-btns button')].map(b => b.textContent.trim()),
+            oldHintGone: !pop.textContent.includes('Higher priority sits'),
+            oldRemoveGone: !pop.textContent.includes('Remove from my day'),
+            expectedProgram: picked.program,
+            expectedRoom: picked.room,
+          };
+        }
+    """)
+    record(popup["titleLink"], "session popup title links to the schedule site")
+    record(popup["program"] == popup["expectedProgram"], "session popup shows the program as colored text",
+           f"program={popup['program']}")
+    record(popup["programColor"] != "", "session popup applies a program text color")
+    record(popup["dateIcon"] == "#i-calendar", "session popup uses a calendar icon for the date",
+           popup["dateIcon"])
+    record(popup["date"] != "", "session popup shows the session date")
+    record(popup["timeIcon"] == "#i-clock", "session popup uses a clock icon for the time",
+           popup["timeIcon"])
+    record(" - " in popup["time"] and ("AM" in popup["time"] or "PM" in popup["time"]),
+           "session popup shows a full spaced time range", popup["time"])
+    record(popup["durationIcon"] == "#i-hourglass", "session popup uses an hourglass icon for duration",
+           popup["durationIcon"])
+    record("min" in popup["duration"] or "hr" in popup["duration"], "session popup shows duration",
+           popup["duration"])
+    record(popup["locationIcon"] == "#i-pin", "session popup uses a pin icon for location",
+           popup["locationIcon"])
+    record(popup["location"] == popup["expectedRoom"], "session popup location is a quiet room action",
+           f"location={popup['location']}")
+    record(popup["removeLabel"] == "Remove from My Day", "session popup has an icon-only remove action")
+    record(popup["priorityLabels"] == ["High", "Normal", "Low"], "session popup uses modern priority labels",
+           f"labels={popup['priorityLabels']}")
+    record(popup["oldHintGone"], "session popup removes the old priority explainer")
+    record(popup["oldRemoveGone"], "session popup removes the old full-width remove label")
 
     removed = page.evaluate("""
         () => {
