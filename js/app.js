@@ -963,7 +963,7 @@ function openSharePop(anchor){
   positionPopover(sharePop,anchor,236,340,'right');
 }
 function closeSharePop(){sharePop.classList.remove('show');}
-document.addEventListener('click',e=>{if(!sharePop.contains(e.target)&&e.target.id!=='btnShare')closeSharePop();});
+document.addEventListener('click',e=>{if(!sharePop.contains(e.target)&&!e.target.closest?.('#btnShare'))closeSharePop();});
 window.addEventListener('resize',closeSharePop);
 
 /* ---- utils ---- */
@@ -1026,7 +1026,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   document.getElementById('btnIcs').onclick=exportICS;
   document.getElementById('btnExportJson').onclick=exportJSON;
   document.getElementById('btnFloorPlan').onclick=()=>openFloorPlan('');
-  document.getElementById('btnShare').onclick=(e)=>{sharePop.classList.contains('show')?closeSharePop():openSharePop(e.currentTarget);};
+  document.getElementById('btnShare').onclick=(e)=>{e.stopPropagation();sharePop.classList.contains('show')?closeSharePop():openSharePop(e.currentTarget);};
   document.getElementById('fpClose').onclick=closeFloorPlan;
   document.getElementById('fpOverlay').addEventListener('click',e=>{if(e.target.id==='fpOverlay')closeFloorPlan();});
   document.getElementById('fpLv1').onclick=()=>showFpLevel(1);

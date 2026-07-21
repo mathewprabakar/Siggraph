@@ -432,6 +432,45 @@ def check_shared_schedule_link(engine: str, browser, index_url: str) -> None:
     context.close()
 
 
+def check_mobile_share_button(engine: str, browser, index_url: str) -> None:
+    print(f"\n== {engine}: mobile Share button ==")
+    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
+    page, errors = fresh_page(context, index_url)
+
+    hit = page.evaluate("""
+        () => {
+          const btn = document.getElementById('btnShare');
+          const icon = btn.querySelector('svg');
+          const r = icon.getBoundingClientRect();
+          const x = r.left + r.width / 2;
+          const y = r.top + r.height / 2;
+          const target = document.elementFromPoint(x, y);
+          return {
+            x,
+            y,
+            targetTag: target?.tagName || '',
+            targetId: target?.id || '',
+            targetInsideButton: !!target?.closest?.('#btnShare'),
+          };
+        }
+    """)
+    page.touchscreen.tap(hit["x"], hit["y"])
+    page.wait_for_timeout(50)
+    opened = page.evaluate("""
+        () => ({
+          shown: document.getElementById('sharePop').classList.contains('show'),
+          label: document.querySelector('#sharePop .share-url')?.textContent.trim() || '',
+        })
+    """)
+    record(hit["targetInsideButton"], "mobile Share icon tap targets a descendant of the Share button",
+           f"target={hit['targetTag']}#{hit['targetId']}")
+    record(opened["shown"], "mobile Share icon tap opens and keeps the popover open")
+    record(opened["label"] == "App link", "mobile Share popover renders the app QR immediately",
+           opened["label"])
+    record(len(errors) == 0, "no console/page errors during mobile Share tap", "; ".join(errors))
+    context.close()
+
+
 def check_large_share_qr(engine: str, browser, index_url: str) -> None:
     print(f"\n== {engine}: large share QR sizing ==")
     context = browser.new_context(viewport={"width": 390, "height": 844})
@@ -840,6 +879,7 @@ def main() -> int:
                     check_layout(engine, browser, index_url)
                     check_session_flow(engine, browser, index_url)
                     check_shared_schedule_link(engine, browser, index_url)
+                    check_mobile_share_button(engine, browser, index_url)
                     check_large_share_qr(engine, browser, index_url)
                     check_filter_chips(engine, browser, index_url)
                     check_registration_badge_toggle(engine, browser, index_url)
