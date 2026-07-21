@@ -186,8 +186,7 @@
   .day-tab .day-label{color:inherit}
   .day-tab[aria-pressed="true"]{background:var(--teal-bg);border-color:#a9cdd2;color:var(--teal-ink)}
   .day-tab .badge{min-width:17px;height:17px;border-radius:999px;background:#fff;color:var(--teal-ink);border:1px solid var(--line);font-size:9.5px;line-height:15px;font-weight:700;padding:0 5px;text-align:center}
-  .day-tab .dot{width:7px;height:7px;border-radius:50%;background:var(--wine);box-shadow:0 0 0 2px var(--wine-bg);display:none;flex:0 0 auto}
-  .day-tab.hasconflict .dot{display:block} .day-tab.hasconflict .badge{display:none}
+  .day-tab .dot{display:none}
 
   .conflict-strip{margin:0 12px;background:var(--wine-bg);border:1px solid #d9b6ad;color:var(--wine);border-radius:9px;padding:8px 11px;font-size:12.5px;display:none;align-items:center;gap:8px}
   .conflict-strip .ico{width:15px;height:15px;flex:0 0 auto}
@@ -211,7 +210,6 @@
   .ev .em{font-family:var(--mono);font-size:10px;opacity:.92;line-height:1.2;overflow:hidden;flex-shrink:0}
   .ev.compact{padding:4px 8px}
   .ev.compact .et{white-space:nowrap;text-overflow:ellipsis}
-  .ev.conflict{outline:2px solid var(--wine);outline-offset:-2px}
   .ev .pri{position:absolute;top:4px;left:5px;font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.04em;background:rgba(255,255,255,.26);border-radius:5px;padding:1px 4px;display:none}
   .ev.p-high{box-shadow:inset 3px 0 0 rgba(255,255,255,.85), 0 1px 3px rgba(42,66,73,.22)} .ev.p-low{opacity:.82}
   .ev .et{padding-left:2px}

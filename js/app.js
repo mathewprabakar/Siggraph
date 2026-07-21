@@ -363,7 +363,6 @@ function setPriority(id,pr){const e=picked.get(id);if(!e)return;e.pr=pr;saveStat
 
 /* ---- timetable ---- */
 function eventsForDay(iso){return [...picked.values()].filter(e=>e.day===iso&&e.s0!=null&&e.e0!=null).sort((a,b)=>a.s0-b.s0||a.e0-b.e0);}
-function findConflicts(evs){const c=new Set();for(let i=0;i<evs.length;i++)for(let j=i+1;j<evs.length;j++){if(evs[i].s0<evs[j].e0&&evs[j].s0<evs[i].e0){c.add(evs[i].id);c.add(evs[j].id);}}return c;}
 function clusters(evs){
   const out=[];let cur=[],end=-1;
   evs.forEach(e=>{if(cur.length&&e.s0>=end){out.push(cur);cur=[];end=-1;}cur.push(e);end=Math.max(end,e.e0);});
@@ -385,6 +384,7 @@ function renderTimetable(){
   const grid=document.getElementById('grid');
   const evs=eventsForDay(activeDay);
   const strip=document.getElementById('conflictStrip');
+  if(strip){strip.className='conflict-strip';strip.innerHTML='';}
   document.getElementById('dayCount').textContent=evs.length?(evs.length+' session'+(evs.length>1?'s':'')):'';
   let html='<div class="hours">';
   for(let m=GRID_START;m<GRID_END;m+=60)html+=`<div class="hour"><span class="lbl mono">${fmtTime(m)}</span></div>`;
@@ -400,7 +400,7 @@ function renderTimetable(){
     e.innerHTML='Nothing planned for this day yet.<br>Pick sessions on the left, or tap another day above.';
     lane.appendChild(e);
   }else{
-    const conf=findConflicts(evs);const gutter=6;
+    const gutter=6;
     clusters(evs).forEach(cl=>{
       const {cols,colOf}=layoutCluster(cl);const wPct=100/cols;
       cl.forEach(e=>{
@@ -409,7 +409,7 @@ function renderTimetable(){
         const h=Math.max(22,(e.e0-e.s0)*PXPERMIN-2);
         const el=document.createElement('div');
         const short=h<40;
-        el.className='ev'+(conf.has(e.id)?' conflict':'')+(e.pr===1?' p-high':'')+(e.pr===3?' p-low':'')+(short?' compact':'');
+        el.className='ev'+(e.pr===1?' p-high':'')+(e.pr===3?' p-low':'')+(short?' compact':'');
         el.dataset.id=e.id;
         el.dataset.programColor=e.program;
         el.style.top=top+'px';el.style.height=h+'px';
@@ -423,10 +423,7 @@ function renderTimetable(){
         lane.appendChild(el);
       });
     });
-    if(conf.size){strip.className='conflict-strip show';strip.innerHTML=`<svg class="ico"><use href="#i-alert"></use></svg><strong>${conf.size} sessions clash</strong> on this day — outlined in red. The higher-priority one sits on the left; tap any session to set High / Med / Low.`;}
-    else{strip.className='conflict-strip';strip.innerHTML='';}
   }
-  if(!evs.length){strip.className='conflict-strip';strip.innerHTML='';}
   updateNowLine();
   renderLegend(evs);
   syncDesktopPanelHeights();
@@ -471,9 +468,9 @@ function renderLegend(evs){
 function syncDayTabs(){
   document.querySelectorAll('.day-tab').forEach(tab=>{
     const iso=tab.dataset.iso;tab.setAttribute('aria-pressed',String(iso===activeDay));
-    const evs=eventsForDay(iso);const conf=findConflicts(evs);
+    const evs=eventsForDay(iso);
     tab.querySelector('.badge').textContent=evs.length;
-    tab.classList.toggle('hasconflict',conf.size>0);
+    tab.classList.remove('hasconflict');
     tab.querySelector('.badge').style.display=evs.length?'':'none';
   });
 }

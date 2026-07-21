@@ -511,7 +511,9 @@ def check_clear_confirmation(engine: str, browser, index_url: str) -> None:
           }
           pair.forEach(c => App.togglePick(c));
           document.getElementById('swDay').click();
-          const conflictShown = document.getElementById('conflictStrip').classList.contains('show');
+          const conflictsHidden = !document.getElementById('conflictStrip').classList.contains('show')
+            && !document.querySelector('.day-tab.hasconflict')
+            && !document.querySelector('.ev.conflict');
           document.getElementById('btnClear').click();
           const opened = document.getElementById('confirmOverlay').classList.contains('show');
           document.getElementById('btnCancelClear').click();
@@ -519,19 +521,17 @@ def check_clear_confirmation(engine: str, browser, index_url: str) -> None:
           document.getElementById('btnClear').click();
           document.getElementById('btnConfirmClear').click();
           return {
-            conflictShown,
+            conflictsHidden,
             opened,
             cancelled,
             cleared: App.picked.size === 0 && !document.getElementById('confirmOverlay').classList.contains('show'),
-            conflictCleared: !document.getElementById('conflictStrip').classList.contains('show'),
           };
         }
     """)
-    record(flow["conflictShown"], "test schedule shows a conflict before clearing")
+    record(flow["conflictsHidden"], "overlapping sessions do not show conflict warnings")
     record(flow["opened"], "Clear opens the app confirmation dialog")
     record(flow["cancelled"], "Cancel keeps selected sessions")
     record(flow["cleared"], "Confirm clears selected sessions")
-    record(flow["conflictCleared"], "Confirm clear hides the conflict banner")
     record(len(errors) == 0, "no console/page errors during clear confirmation", "; ".join(errors))
     context.close()
 
