@@ -960,7 +960,7 @@ function openSharePop(anchor){
   const nsBtn=document.getElementById('btnNativeShare');
   if(nsBtn)nsBtn.onclick=()=>{navigator.share({title:document.title,url:currentShareUrl()}).catch(()=>{});};
   sharePop.classList.add('show');
-  positionPopover(sharePop,anchor,236,340,'right');
+  positionPopover(sharePop,anchor,246,340,'right');
 }
 function closeSharePop(){sharePop.classList.remove('show');}
 document.addEventListener('click',e=>{if(!sharePop.contains(e.target)&&!e.target.closest?.('#btnShare'))closeSharePop();});

@@ -460,6 +460,12 @@ def check_mobile_share_button(engine: str, browser, index_url: str) -> None:
         () => ({
           shown: document.getElementById('sharePop').classList.contains('show'),
           label: document.querySelector('#sharePop .share-url')?.textContent.trim() || '',
+          centered: (() => {
+            const pop = document.getElementById('sharePop').getBoundingClientRect();
+            const qr = document.querySelector('#sharePop .qr-box').getBoundingClientRect();
+            return Math.abs((qr.left - pop.left) - (pop.right - qr.right)) < 1 &&
+              (qr.left - pop.left) >= 13 && (pop.right - qr.right) >= 13;
+          })(),
         })
     """)
     record(hit["targetInsideButton"], "mobile Share icon tap targets a descendant of the Share button",
@@ -467,6 +473,7 @@ def check_mobile_share_button(engine: str, browser, index_url: str) -> None:
     record(opened["shown"], "mobile Share icon tap opens and keeps the popover open")
     record(opened["label"] == "App link", "mobile Share popover renders the app QR immediately",
            opened["label"])
+    record(opened["centered"], "mobile Share app QR is centered with balanced margins")
     record(len(errors) == 0, "no console/page errors during mobile Share tap", "; ".join(errors))
     context.close()
 
@@ -485,6 +492,8 @@ def check_large_share_qr(engine: str, browser, index_url: str) -> None:
           const canvas = document.getElementById('qrCanvas');
           const fallback = document.querySelector('.qr-fallback');
           const rect = (canvas || fallback).getBoundingClientRect();
+          const pop = document.getElementById('sharePop').getBoundingClientRect();
+          const qrBox = document.querySelector('#sharePop .qr-box').getBoundingClientRect();
           return {
             label: document.querySelector('#sharePop .share-url').textContent,
             fallback: fallback?.textContent.trim() || '',
@@ -492,6 +501,8 @@ def check_large_share_qr(engine: str, browser, index_url: str) -> None:
             height: rect.height,
             backingWidth: canvas?.width || 0,
             urlLength: App.shareUrl(true).length,
+            centered: Math.abs((qrBox.left - pop.left) - (pop.right - qrBox.right)) < 1 &&
+              (qrBox.left - pop.left) >= 13 && (pop.right - qrBox.right) >= 13,
           };
         }
     """)
@@ -500,6 +511,7 @@ def check_large_share_qr(engine: str, browser, index_url: str) -> None:
            f"{qr['width']}x{qr['height']}")
     record(not qr["fallback"] and qr["backingWidth"] >= qr["width"], "large schedule QR renders with compact stable payload",
            f"fallback={qr['fallback']} backing={qr['backingWidth']} display={qr['width']}")
+    record(qr["centered"], "large schedule QR is centered with balanced margins")
     record(len(errors) == 0, "no console/page errors while rendering large share QR", "; ".join(errors))
     context.close()
 
