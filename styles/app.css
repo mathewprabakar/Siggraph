@@ -99,6 +99,7 @@
   .tbtn.danger:hover{border-color:var(--wine);color:var(--wine)}
   .tbtn.danger-fill{background:var(--wine);border-color:var(--wine);color:#fff}
   .tbtn.danger-fill:hover{background:#6f1e2b;border-color:#6f1e2b;color:#fff}
+  .label-short{display:none}
   .help-btn{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-size:12px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;opacity:.76}
   .help-btn:hover{opacity:1;border-color:var(--teal);background:var(--teal-bg);color:var(--teal-ink)}
   .save-note{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);white-space:nowrap;display:flex;flex-direction:column;line-height:1.25}
@@ -386,6 +387,7 @@
   }
 
   @media (max-width:920px){
+    header{position:static}
     .wrap{grid-template-columns:1fr;gap:0}
     .switch{display:flex;position:sticky;top:0;z-index:30;gap:0;margin:0 0 14px;background:var(--panel);border:1px solid var(--line);border-radius:11px;overflow:hidden;box-shadow:var(--shadow);grid-column:1/-1}
     .switch button{flex:1;border:none;background:#fff;padding:11px;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink-soft);letter-spacing:.04em}
@@ -396,7 +398,17 @@
     .day-tabs{flex-wrap:nowrap}
     .day-tab{flex:0 0 auto}
     .catalog{max-height:none}
-    .head-inner{position:relative;padding:10px 48px 10px 14px} .brand h1{font-size:17px} .wrap{padding:14px}
+    .head-inner{position:relative;padding:10px 48px 10px 14px;gap:8px} .brand h1{font-size:17px} .wrap{padding:14px}
+    .head-tools{width:100%;margin-left:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;align-items:stretch}
+    .head-tools .save-note{grid-column:1/-1}
+    .head-tools .tbtn{justify-content:center;min-width:0;padding:7px 6px;font-size:12px;white-space:nowrap}
+    .head-tools #btnShare,
+    .head-tools #btnIcs,
+    .head-tools #btnFloorPlan{grid-column:span 2}
+    .head-tools #btnLoadFile,
+    .head-tools #btnExportJson{grid-column:span 3}
+    .label-full{display:none}
+    .label-short{display:inline}
     .head-tools .help-btn{position:absolute;top:12px;right:14px}
     .theme-foot{padding:6px 14px 26px}
     .tour-card{left:14px!important;right:auto!important;top:auto!important;bottom:14px!important}

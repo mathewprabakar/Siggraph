@@ -112,6 +112,34 @@ def check_layout(engine: str, browser, index_url: str) -> None:
             """)
             record(day_chip_rows == 1, f"{name} ({w}x{h}) day filters stay on one line with Live",
                    f"rows={day_chip_rows}")
+        else:
+            mobile_actions = page.evaluate("""
+                () => {
+                  const rect = id => {
+                    const r = document.getElementById(id).getBoundingClientRect();
+                    return { top: Math.round(r.top), left: r.left, right: r.right, width: r.width, text: document.getElementById(id).textContent.trim() };
+                  };
+                  const primary = ['btnShare','btnIcs','btnFloorPlan'].map(rect);
+                  const secondary = ['btnLoadFile','btnExportJson'].map(rect);
+                  return {
+                    primaryRows: new Set(primary.map(r => r.top)).size,
+                    secondaryRows: new Set(secondary.map(r => r.top)).size,
+                    secondaryBelow: Math.min(...secondary.map(r => r.top)) > Math.max(...primary.map(r => r.top)),
+                    calendarLabel: [...document.querySelectorAll('#btnIcs span')]
+                      .find(el => getComputedStyle(el).display !== 'none')?.textContent.trim(),
+                    fullWidthRows: primary.every(r => r.width > 90) && secondary.every(r => r.width > 140),
+                  };
+                }
+            """)
+            record(mobile_actions["primaryRows"] == 1 and mobile_actions["secondaryRows"] == 1 and
+                   mobile_actions["secondaryBelow"] and mobile_actions["calendarLabel"] == "Calendar" and
+                   mobile_actions["fullWidthRows"],
+                   f"{name} ({w}x{h}) header actions use a tidy mobile grid",
+                   mobile_actions)
+            mobile_header_position = page.evaluate("getComputedStyle(document.querySelector('header')).position")
+            record(mobile_header_position == "static",
+                   f"{name} ({w}x{h}) header scrolls away instead of staying pinned",
+                   f"position={mobile_header_position}")
         day_tab_rows = page.evaluate("""
             () => {
               const tops = [...document.querySelectorAll('#dayTabs .day-tab')]
