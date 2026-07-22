@@ -892,6 +892,114 @@ def check_floorplan(engine: str, browser, index_url: str) -> None:
     context.close()
 
 
+def check_guided_tutorial(engine: str, browser, index_url: str) -> None:
+    print(f"\n== {engine}: guided tutorial ==")
+    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
+    page, errors = fresh_page(context, index_url)
+
+    first = page.evaluate("""
+        () => {
+          document.getElementById('btnTutorial').click();
+          const help = document.getElementById('btnTutorial').getBoundingClientRect();
+          return {
+            shown: document.getElementById('tourOverlay').classList.contains('show'),
+            step: document.getElementById('tourStep').textContent.trim(),
+            title: document.getElementById('tourTitle').textContent.trim(),
+            body: document.getElementById('tourBody').textContent.trim(),
+            helpText: document.getElementById('btnTutorial').textContent.trim(),
+            helpLabel: document.getElementById('btnTutorial').getAttribute('aria-label'),
+            helpRound: Math.abs(help.width - help.height) < 1 && help.width <= 28,
+            helpTopRight: help.right <= innerWidth - 12 && help.top < 24,
+            highlightedSearch: document.getElementById('search').classList.contains('tour-highlight'),
+            closeLabel: document.getElementById('tourExit').getAttribute('aria-label'),
+            closeText: document.getElementById('tourExit').textContent.trim(),
+            closeIcon: document.querySelector('#tourExit use')?.getAttribute('href'),
+          };
+        }
+    """)
+    record(first["shown"], "guided tutorial opens from the header")
+    record(first["helpText"] == "?" and first["helpLabel"] == "Start guided tour" and first["helpRound"] and first["helpTopRight"],
+           "guided tutorial opens from a quiet mobile header help button", first)
+    record(first["step"] == "Step 1 of 7" and first["title"] == "Find sessions fast",
+           "guided tutorial starts on search", first)
+    record("filters help trim the catalog" in first["body"],
+           "guided tutorial uses refined explanatory copy", first["body"])
+    record(first["closeLabel"] == "Close tutorial" and first["closeText"] == "" and first["closeIcon"] == "#i-x",
+           "guided tutorial uses an icon-only close button", first)
+    record(first["highlightedSearch"], "guided tutorial highlights the current target")
+
+    my_day = page.evaluate("""
+        () => {
+          document.getElementById('tourNext').click();
+          document.getElementById('tourNext').click();
+          return {
+            step: document.getElementById('tourStep').textContent.trim(),
+            dayView: document.getElementById('swDay').getAttribute('aria-pressed') === 'true',
+            seeded: App.picked.size === 1,
+            hasTile: !!document.querySelector('#grid .ev.tour-highlight'),
+          };
+        }
+    """)
+    record(my_day["step"] == "Step 3 of 7" and my_day["dayView"],
+           "guided tutorial switches to My Day for timeline step", my_day)
+    record(my_day["seeded"] and my_day["hasTile"],
+           "guided tutorial seeds and highlights a temporary My Day session", my_day)
+
+    floor = page.evaluate("""
+        () => {
+          document.getElementById('tourNext').click();
+          document.getElementById('tourNext').click();
+          return {
+            step: document.getElementById('tourStep').textContent.trim(),
+            title: document.getElementById('tourTitle').textContent.trim(),
+            body: document.getElementById('tourBody').textContent.trim(),
+          };
+        }
+    """)
+    record(floor["step"] == "Step 5 of 7" and floor["title"] == "Use the floor plan" and
+           "Level controls" not in floor["body"],
+           "guided tutorial floor-plan copy avoids inaccurate level-control wording", floor)
+
+    theme = page.evaluate("""
+        () => {
+          for (let i = 0; i < 2; i++) document.getElementById('tourNext').click();
+          const card = document.getElementById('tourCard').getBoundingClientRect();
+          const target = document.getElementById('themeSelect').getBoundingClientRect();
+          return {
+            step: document.getElementById('tourStep').textContent.trim(),
+            title: document.getElementById('tourTitle').textContent.trim(),
+            highlightedTheme: document.getElementById('themeSelect').classList.contains('tour-highlight'),
+            highlightedFooter: document.getElementById('themeFoot').classList.contains('tour-highlight'),
+            align: document.getElementById('tourCard').dataset.align,
+            cardVisible: card.width > 0 && card.height > 0 &&
+              card.left >= 0 && card.right <= innerWidth &&
+              card.top >= 0 && card.bottom <= innerHeight,
+            rightAligned: Math.abs(card.right - Math.min(innerWidth - 14, target.right)) < 3,
+          };
+        }
+    """)
+    record(theme["step"] == "Step 7 of 7" and theme["title"] == "Choose a theme",
+           "guided tutorial reaches the theme step", theme)
+    record(theme["highlightedTheme"] and not theme["highlightedFooter"] and theme["cardVisible"] and
+           theme["align"] == "right" and theme["rightAligned"],
+           "guided tutorial highlights the theme dropdown and keeps the card right aligned", theme)
+
+    closed = page.evaluate("""
+        () => {
+          document.getElementById('tourExit').click();
+          return {
+            shown: document.getElementById('tourOverlay').classList.contains('show'),
+            pickedCount: App.picked.size,
+            highlights: document.querySelectorAll('.tour-highlight').length,
+          };
+        }
+    """)
+    record(not closed["shown"] and closed["pickedCount"] == 0 and closed["highlights"] == 0,
+           "guided tutorial exits cleanly and removes its temporary session", closed)
+    record(len(errors) == 0, "no console/page errors during guided tutorial", "; ".join(errors))
+    context.close()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run SIGGRAPH scheduler smoke tests.")
     parser.add_argument(
@@ -930,6 +1038,7 @@ def main() -> int:
                     check_theme_switch_preserves_scroll(engine, browser, index_url)
                     check_clear_confirmation(engine, browser, index_url)
                     check_floorplan(engine, browser, index_url)
+                    check_guided_tutorial(engine, browser, index_url)
                 finally:
                     browser.close()
     finally:

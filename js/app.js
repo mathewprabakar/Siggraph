@@ -966,6 +966,111 @@ function closeSharePop(){sharePop.classList.remove('show');}
 document.addEventListener('click',e=>{if(!sharePop.contains(e.target)&&!e.target.closest?.('#btnShare'))closeSharePop();});
 window.addEventListener('resize',closeSharePop);
 
+/* ---- guided tutorial ---- */
+const tourOverlay=document.getElementById('tourOverlay');
+const tourCard=document.getElementById('tourCard');
+const TOUR_STEPS=[
+  {sel:'#search',title:'Find sessions fast',body:'Start with a title, speaker topic, room, or keyword. Day chips and filters help trim the catalog before you decide what belongs in your schedule.'},
+  {sel:'#catalog .add-btn',title:'Save promising sessions',body:'Tap the plus button to add a session to My Day. Added sessions show a check mark, so you can remove them from the same place while browsing.'},
+  {sel:'#grid .ev',title:'Shape your day',body:'My Day turns your saved sessions into a timeline. Tap any block to review details, adjust priority, jump to the location, or remove it from your schedule.'},
+  {sel:'#catalog .room-link',title:'Preview locations',body:'Room names are interactive. Convention-center rooms open the floor plan with a highlight, while off-site venues show a Google Maps preview.'},
+  {sel:'#btnFloorPlan',title:'Use the floor plan',body:'Open the full LA Convention Center map whenever you need spatial context for rooms and session locations.'},
+  {sel:'#btnShare',title:'Share by QR code',body:'Share the app link, or include your selected sessions when you want to move your schedule to another phone or send it to someone else.'},
+  {sel:'#themeSelect',title:'Choose a theme',body:'Switch between the SIGGRAPH palette, light mode, and dark mode. Theme changes are visual only, so your filters, scroll position, and saved sessions stay put.',align:'right'}
+];
+let tourIndex=0,tourTarget=null,tourSeedId=null;
+function tourSetMobileView(sel){
+  const mobile=window.matchMedia('(max-width:920px)').matches;
+  if(!mobile)return;
+  if(sel&&(sel.includes('dayCol')||sel.includes('#grid')))document.getElementById('swDay').click();
+  else document.getElementById('swBrowse').click();
+}
+function seedTourPick(){
+  if(picked.size||tourSeedId)return;
+  const c=catalog.find(x=>x.day&&x.s0!=null&&x.e0!=null);
+  if(!c)return;
+  const n=norm({...c,pr:2});
+  picked.set(n.id,n);
+  tourSeedId=n.id;
+  activeDay=n.day;
+  saveState();
+  syncCatalogPickedState();renderTimetable();syncDayTabs();
+}
+function clearTourSeed(){
+  if(!tourSeedId)return;
+  picked.delete(tourSeedId);
+  tourSeedId=null;
+  saveState();
+  syncCatalogPickedState();renderTimetable();syncDayTabs();
+}
+function positionTourCard(target,step=TOUR_STEPS[tourIndex]){
+  const margin=14,cardW=330,cardH=tourCard.offsetHeight||190;
+  if(!target){
+    tourCard.style.left=margin+'px';
+    tourCard.style.top=margin+'px';
+    return;
+  }
+  const r=target.getBoundingClientRect();
+  let left=step.align==='right'?r.right-cardW:r.left;
+  if(left+cardW>window.innerWidth-margin)left=window.innerWidth-cardW-margin;
+  left=Math.max(margin,left);
+  let top=r.bottom+12;
+  if(top+cardH>window.innerHeight-margin)top=r.top-cardH-12;
+  if(top<margin)top=margin;
+  tourCard.style.left=left+'px';
+  tourCard.style.top=top+'px';
+}
+function renderTourStep(){
+  const step=TOUR_STEPS[tourIndex];
+  if(tourTarget)tourTarget.classList.remove('tour-highlight');
+  closePop();closeMapPop();closeSharePop();
+  if(tourIndex===2)seedTourPick();
+  else clearTourSeed();
+  tourSetMobileView(step.sel);
+  tourTarget=document.querySelector(step.sel);
+  tourCard.dataset.align=step.align||'left';
+  document.getElementById('tourStep').textContent=`Step ${tourIndex+1} of ${TOUR_STEPS.length}`;
+  document.getElementById('tourTitle').textContent=step.title;
+  document.getElementById('tourBody').textContent=step.body;
+  document.getElementById('tourPrev').disabled=tourIndex===0;
+  document.getElementById('tourNext').textContent=tourIndex===TOUR_STEPS.length-1?'Done':'Next';
+  if(tourTarget){
+    tourTarget.classList.add('tour-highlight');
+    tourTarget.scrollIntoView({block:'center',inline:'center',behavior:'auto'});
+  }
+  positionTourCard(tourTarget,step);
+  requestAnimationFrame(()=>positionTourCard(tourTarget,step));
+}
+function startTutorial(){
+  tourIndex=0;
+  closePop();closeMapPop();closeSharePop();closeFloorPlan();closeClearConfirm();
+  tourOverlay.classList.add('show');
+  renderTourStep();
+}
+function closeTutorial(){
+  tourOverlay.classList.remove('show');
+  if(tourTarget)tourTarget.classList.remove('tour-highlight');
+  tourTarget=null;
+  clearTourSeed();
+}
+function nextTourStep(){
+  if(tourIndex>=TOUR_STEPS.length-1){closeTutorial();return;}
+  tourIndex++;
+  renderTourStep();
+}
+function prevTourStep(){
+  if(tourIndex<=0)return;
+  tourIndex--;
+  renderTourStep();
+}
+if(tourOverlay){
+  document.getElementById('tourExit').onclick=closeTutorial;
+  document.getElementById('tourNext').onclick=nextTourStep;
+  document.getElementById('tourPrev').onclick=prevTourStep;
+  tourOverlay.querySelector('.tour-scrim').onclick=closeTutorial;
+}
+window.addEventListener('resize',()=>{if(tourOverlay?.classList.contains('show'))positionTourCard(tourTarget);});
+
 /* ---- utils ---- */
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function download(name,text,mime){const b=new Blob([text],{type:mime});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);}
@@ -1026,6 +1131,7 @@ document.addEventListener('DOMContentLoaded',async ()=>{
   document.getElementById('btnIcs').onclick=exportICS;
   document.getElementById('btnExportJson').onclick=exportJSON;
   document.getElementById('btnFloorPlan').onclick=()=>openFloorPlan('');
+  document.getElementById('btnTutorial').onclick=startTutorial;
   document.getElementById('btnShare').onclick=(e)=>{e.stopPropagation();sharePop.classList.contains('show')?closeSharePop():openSharePop(e.currentTarget);};
   document.getElementById('fpClose').onclick=closeFloorPlan;
   document.getElementById('fpOverlay').addEventListener('click',e=>{if(e.target.id==='fpOverlay')closeFloorPlan();});
@@ -1054,4 +1160,5 @@ window.App = {
   togglePick,
   shareUrl,
   openFloorPlan,
+  startTutorial,
 };

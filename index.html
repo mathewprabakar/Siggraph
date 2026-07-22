@@ -37,6 +37,7 @@
       <button class="tbtn" id="btnFloorPlan" title="Browse the LA Convention Center floor plan"><svg class="ico"><use href="#i-map"></use></svg>Floor plan</button>
       <button class="tbtn quiet" id="btnLoadFile" title="Import a saved picks file"><svg class="ico"><use href="#i-upload"></use></svg>Import</button>
       <button class="tbtn quiet" id="btnExportJson" title="Download a backup of your picks as a .json file"><svg class="ico"><use href="#i-download"></use></svg>Export</button>
+      <button class="help-btn" id="btnTutorial" title="Start a guided tour of the scheduler" aria-label="Start guided tour">?</button>
       <input type="file" id="fileInput" accept=".json" hidden>
     </div>
   </div>
@@ -103,6 +104,21 @@
 <div class="pop" id="pop"></div>
 <div class="pop map-pop" id="mapPop"></div>
 <div class="pop share-pop" id="sharePop"></div>
+<div class="tour-overlay" id="tourOverlay">
+  <div class="tour-scrim"></div>
+  <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
+    <button class="tour-exit" id="tourExit" type="button" title="Close tutorial" aria-label="Close tutorial"><svg class="ico"><use href="#i-x"></use></svg></button>
+    <div class="tour-kicker mono" id="tourStep"></div>
+    <h3 id="tourTitle"></h3>
+    <p id="tourBody"></p>
+    <div class="tour-actions">
+      <div class="tour-nav">
+        <button class="tbtn" id="tourPrev" type="button">Back</button>
+        <button class="tbtn solid" id="tourNext" type="button">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h3 id="confirmTitle">Clear My Day?</h3>
