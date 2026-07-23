@@ -1029,6 +1029,55 @@ def check_guided_tutorial(engine: str, browser, index_url: str) -> None:
     context.close()
 
 
+def check_offline_reload(engine: str, browser, index_url: str) -> None:
+    print(f"\n== {engine}: offline reload ==")
+    context = browser.new_context()
+    page = context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    page.on("console", lambda msg: errors.append(msg.text) if msg.type == "error" else None)
+
+    page.goto(index_url)
+    page.wait_for_function("window.App && App.catalog.length > 400", timeout=10000)
+    sw_ready = page.evaluate("""
+        async () => {
+          if (!('serviceWorker' in navigator)) return false;
+          await navigator.serviceWorker.ready;
+          return true;
+        }
+    """)
+    page.reload()
+    page.wait_for_function("navigator.serviceWorker.controller", timeout=10000)
+    page.wait_for_function("window.App && App.catalog.length > 400", timeout=10000)
+
+    context.set_offline(True)
+    page.reload(wait_until="domcontentloaded")
+    offline = page.evaluate("""
+        async () => {
+          await new Promise(resolve => {
+            const started = performance.now();
+            const tick = () => {
+              if (window.App && App.catalog.length > 400) resolve(true);
+              else if (performance.now() - started > 10000) resolve(false);
+              else requestAnimationFrame(tick);
+            };
+            tick();
+          });
+          return {
+            catalogCount: window.App ? App.catalog.length : 0,
+            title: document.querySelector('.brand h1')?.textContent.trim() || '',
+          };
+        }
+    """)
+    context.set_offline(False)
+
+    record(sw_ready, "service worker becomes ready for offline caching")
+    record(offline["catalogCount"] > 400 and offline["title"] == "My Schedule",
+           "offline reload keeps the app shell and full catalog available", offline)
+    record(len(errors) == 0, "no console/page errors during offline reload", "; ".join(errors))
+    context.close()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run SIGGRAPH scheduler smoke tests.")
     parser.add_argument(
@@ -1068,6 +1117,7 @@ def main() -> int:
                     check_clear_confirmation(engine, browser, index_url)
                     check_floorplan(engine, browser, index_url)
                     check_guided_tutorial(engine, browser, index_url)
+                    check_offline_reload(engine, browser, index_url)
                 finally:
                     browser.close()
     finally:
